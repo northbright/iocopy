@@ -1,0 +1,47 @@
+# Ignore All
+*
+# Unignore All Sub dirs
+!*/
+
+# Unignore Files
+# --------------------------
+
+# gitignore itself
+!.gitignore
+
+# License
+!LICENSE
+
+# Markdown
+!*.md
+
+# Text
+!*.txt
+
+# Shell
+!*.sh
+
+# Golang
+!*.go
+!go.mod
+!go.sum
+
+# Configuration
+!*.json
+!*.yml
+!*.yaml
+config.json
+
+# Cert
+!*.pem
+
+# HTML
+!*.html
+!*.js
+!*.css
+!*.jpg
+!*.png
+!*.gif
+
+# PDF
+!*.pdf
