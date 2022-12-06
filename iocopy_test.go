@@ -90,7 +90,7 @@ func ExampleStart() {
 			percent := float32(float64(n) / (float64(total) / float64(100)))
 			log.Printf("on EventOK: %v/%v bytes written(%.2f%%)", n, total, percent)
 
-			// Get SHA-256 checksum of remote file.
+			// Get the final SHA-256 checksum of the remote file.
 			checksum := hash.Sum(nil)
 			fmt.Printf("SHA-256:\n%x", checksum)
 		}
