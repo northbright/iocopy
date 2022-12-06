@@ -87,7 +87,9 @@ func (e *EventOK) Written() int64 {
 }
 
 // Start returns a channel for the caller to receive IO copy events and start a goroutine to do IO copy.
-// ctx: context.Context. It can be created using WithCancel, WithDeadline, WithTimeout...
+// ctx: context.Context.
+// It can be created using context.WithCancel, context.WithDeadline,
+// context.WithTimeout...
 // dst: io.Writer to copy to.
 // src: io.Reader to copy from.
 // bufSize: size of the buffer. It'll create a buffer in the new goroutine according to the buffer size.
