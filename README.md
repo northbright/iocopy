@@ -1,6 +1,6 @@
 # iocopy
 
-iocopy is a [Golang](https://golang.org) package which provide function(s) do IO copy in a new goroutine and returns an event channel for the caller.
+iocopy is a [Golang](https://golang.org) package which provide function to do IO copy in a new goroutine and returns an event channel for the caller.
 
 ## Usage
 See [Example Code](https://github.com/northbright/iocopy/blob/master/iocopy_test.go)
