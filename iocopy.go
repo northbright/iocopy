@@ -141,6 +141,10 @@ func Start(
 				}
 
 			case <-ctx.Done():
+				// Stop ticker.
+				if ticker != nil {
+					ticker.Stop()
+				}
 				ch <- newEventError(ctx.Err())
 				return
 
