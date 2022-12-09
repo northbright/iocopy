@@ -47,8 +47,6 @@ func (e *EventWritten) Written() int64 {
 }
 
 // EventError is the event that an error occurs.
-// The error can be a context error(ctx.Err()) when the context is canceled or
-// an IO related error during copy.
 type EventError struct {
 	err error
 }
@@ -64,6 +62,32 @@ func (e *EventError) String() string {
 
 // Err returns the error occured during IO copy.
 func (e *EventError) Err() error {
+	return e.err
+}
+
+// EventOK is the event that IO copy stopped.
+type EventStop struct {
+	err     error
+	written int64
+}
+
+func newEventStop(err error, written int64) *EventStop {
+	return &EventStop{err: err, written: written}
+}
+
+// String implements the stringer interface.
+func (e *EventStop) String() string {
+	return fmt.Sprintf("written stopped(reason: %v, %d bytes written)", e.err, e.written)
+}
+
+// Written returns the count of bytes written successfuly.
+func (e *EventStop) Written() int64 {
+	return e.written
+}
+
+// Err returns the the context error that explains why IO copying is stopped.
+// It can be context.Canceled or context.DeadlineExceeded.
+func (e *EventStop) Err() error {
 	return e.err
 }
 
@@ -141,11 +165,14 @@ func Start(
 				}
 
 			case <-ctx.Done():
+				// Context is canceled or
+				// context's deadline exceeded.
+
 				// Stop ticker.
 				if ticker != nil {
 					ticker.Stop()
 				}
-				ch <- newEventError(ctx.Err())
+				ch <- newEventStop(ctx.Err(), written)
 				return
 
 			default:

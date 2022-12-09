@@ -77,6 +77,10 @@ func ExampleStart() {
 			n := ev.Written()
 			percent := float32(float64(n) / (float64(total) / float64(100)))
 			log.Printf("on EventWritten: %v/%v bytes written(%.2f%%)", n, total, percent)
+		case *iocopy.EventStop:
+			// Context is canceled or
+			// context's deadline exceeded.
+			log.Printf("on EventStop: %v", ev.Err())
 
 		case *iocopy.EventError:
 			// an error occured.
