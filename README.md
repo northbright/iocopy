@@ -72,9 +72,6 @@ func ExampleStart() {
 	ch := iocopy.Start(ctx, hash, resp.Body, 16*1024*1024, 500*time.Millisecond)
 
 	// Read the events from the channel.
-	// The channel will be closed when:
-	// (1). an error occured.
-	// (2). IO copy succeeded.
 	for event := range ch {
 		switch ev := event.(type) {
 		case *iocopy.EventWritten:
@@ -109,7 +106,8 @@ func ExampleStart() {
 
 	// The event channel will be closed after:
 	// (1). iocopy.EventError received.
-	// (2). iocopy.EventOK received.
+	// (2). iocopy.EventStop received.
+	// (3). iocopy.EventOK received.
 	// The for-range loop exits when the channel is closed.
 	log.Printf("IO copy gouroutine exited and the event channel is closed")
 

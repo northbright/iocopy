@@ -18,10 +18,11 @@ const (
 // Event is the interface that wraps String method.
 // When Start is called, it'll return a channel for the caller to receive
 // IO copy related events.
-// Currently, there're 3 types of events:
+// Currently, there're 4 types of events:
 // (1). EventWritten - n bytes have been written successfully.
 // (2). EventError - an error occurs and the goroutine exits.
-// (3). EventOK - IO copy succeeded.
+// (3). EventOK - IO copy stopped.
+// (4). EventOK - IO copy succeeded.
 type Event interface {
 	// stringer
 	String() string
@@ -120,9 +121,23 @@ func (e *EventOK) Written() int64 {
 // interval: interval to send EventWritten event to the channel.
 // You may set it to DefaultInterval.
 // ch: the returned channel to receive IO copy events.
-// The channel will be closed when:
-// (1). an error occured(context error or IO copy error).
-// (2). IO copy succeeded.
+// There're 4 types of events will be send to the channel:
+// (1). n bytes have been written successfully.
+//
+//	It'll send an EventWritten to the channel.
+//
+// (2). an error occured
+//
+//	It'll send an EventError to the channel and close the channel.
+//
+// (3). IO copy stopped(context is canceled or context's deadline exceeded).
+//
+//	It'll send an EventStop to the channel and close the channel.
+//
+// (4). IO copy succeeded.
+//
+//	It'll send an EventOK to the channel and close the channel.
+//
 // You may use a for-range loop to read events from the channel.
 func Start(
 	ctx context.Context,
