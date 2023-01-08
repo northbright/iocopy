@@ -17,13 +17,13 @@ func ExampleStart() {
 	// It reads a remote file and calculates its SHA-256 hash.
 	// It shows how to read events and process them from the event channel.
 
-	// go1.19.3.darwin-amd64.pkg
+	// URL of Ubuntu release.
 	// SHA-256:
-	// a4941f5b09c43adeed13aaf435003a1e8852977037b3e6628d11047b087c4c66
-	goPkgURL := "https://golang.google.cn/dl/go1.19.3.darwin-amd64.pkg"
+	// 10f19c5b2b8d6db711582e0e27f5116296c34fe4b313ba45f9b201a5007056cb
+	downloadURL := "https://www.releases.ubuntu.com/jammy/ubuntu-22.04.1-live-server-amd64.iso"
 
 	// Do HTTP request and get the response.
-	resp, err := http.Get(goPkgURL)
+	resp, err := http.Get(downloadURL)
 	if err != nil {
 		log.Printf("http.Get() error: %v", err)
 		return
@@ -33,8 +33,14 @@ func ExampleStart() {
 		log.Printf("status code is not 200 or 206")
 		return
 	}
+
 	// response.Body is an io.ReadCloser.
-	defer resp.Body.Close()
+	// Do not forget to close the body.
+	// iocopy.Start can also close the io.ReadCloser on goroutine exit when
+	// tryClosingReaderOnExit is set to true.
+	// Uncomment below line if tryClosingReaderOnExit is set to false when
+	// call iocopy.Start.
+	// defer resp.Body.Close()
 
 	// Get remote file size.
 	contentLength := resp.Header.Get("Content-Length")
@@ -63,7 +69,16 @@ func ExampleStart() {
 
 	// Start a goroutine to do IO copy.
 	// Read from response.Body and write to hash.Hash to compute hash.
-	ch := iocopy.Start(ctx, hash, resp.Body, 16*1024*1024, 500*time.Millisecond)
+	ch := iocopy.Start(
+		ctx,
+		hash,
+		resp.Body,
+		// buffer size
+		16*1024*1024,
+		// interval to report written bytes
+		500*time.Millisecond,
+		// tryClosingReaderOnExit
+		true)
 
 	// Read the events from the channel.
 	for event := range ch {
@@ -107,5 +122,5 @@ func ExampleStart() {
 
 	// Output:
 	// SHA-256:
-	// a4941f5b09c43adeed13aaf435003a1e8852977037b3e6628d11047b087c4c66
+	// 10f19c5b2b8d6db711582e0e27f5116296c34fe4b313ba45f9b201a5007056cb
 }
