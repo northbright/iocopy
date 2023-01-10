@@ -123,7 +123,8 @@ func (e *EventOK) Written() int64 {
 // tryClosingReaderOnExit: if need to try closing the reader on goroutine exit.
 // Caller may set it to true when src is an io.ReadCloser.
 // e.g. http.Response.Body, os.File.
-// ch: the returned channel to receive IO copy events.
+//
+// It returns a channel to receive IO copy events.
 // There're 4 types of events will be send to the channel:
 // (1). n bytes have been written successfully.
 //
