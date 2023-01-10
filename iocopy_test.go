@@ -58,13 +58,14 @@ func ExampleStart() {
 	// It can be created by context.WithCancel, context.WithDeadline,
 	// context.WithTimeout...
 	// You may test timeout context.
-	// The IO copy should fail and the channel will receive an EventError:
-	// context deadline exceeded.
+	// The IO copy will be stopped
+	// and an EventStop will be sent to the channel.
+	// event.Err() will return "context deadline exceeded".
 	// ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
 	// defer cancel()
 
 	// Use background context by default.
-	// IO copy should succeed and the channel will receive an EventOK.
+	// IO copy should succeed and an EventOK will be sent to the channel.
 	ctx := context.Background()
 
 	// Start a goroutine to do IO copy.
