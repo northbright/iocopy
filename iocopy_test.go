@@ -70,14 +70,17 @@ func ExampleStart() {
 	// Start a goroutine to do IO copy.
 	// Read from response.Body and write to hash.Hash to compute hash.
 	ch := iocopy.Start(
+		// Context
 		ctx,
+		// Writer(dst)
 		hash,
+		// Reader(src)
 		resp.Body,
-		// buffer size
+		// Buffer size
 		16*1024*1024,
-		// interval to report written bytes
+		// Interval to report written bytes
 		500*time.Millisecond,
-		// tryClosingReaderOnExit
+		// Try closing reader on exit
 		true)
 
 	// Read the events from the channel.
