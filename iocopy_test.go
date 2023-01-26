@@ -36,11 +36,7 @@ func ExampleStart() {
 
 	// response.Body is an io.ReadCloser.
 	// Do not forget to close the body.
-	// iocopy.Start can also close the io.ReadCloser on goroutine exit when
-	// tryClosingReaderOnExit is set to true.
-	// Uncomment below line if tryClosingReaderOnExit is set to false when
-	// call iocopy.Start.
-	// defer resp.Body.Close()
+	defer resp.Body.Close()
 
 	// Get remote file size.
 	contentLength := resp.Header.Get("Content-Length")
@@ -80,9 +76,7 @@ func ExampleStart() {
 		// Buffer size
 		16*1024*1024,
 		// Interval to report written bytes
-		500*time.Millisecond,
-		// Try closing reader on exit
-		true)
+		500*time.Millisecond)
 
 	// Read the events from the channel.
 	for event := range ch {
