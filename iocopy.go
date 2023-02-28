@@ -208,6 +208,9 @@ func Start(
 						ticker.Stop()
 					}
 
+					// Send an EventWritten at least before
+					// send en EventOK.
+					ch <- newEventWritten(written)
 					ch <- newEventOK(written)
 					return
 				} else {
