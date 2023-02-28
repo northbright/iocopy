@@ -17,10 +17,9 @@ func ExampleStart() {
 	// It reads a remote file and calculates its SHA-256 hash.
 	// It shows how to read events and process them from the event channel.
 
-	// URL of Ubuntu release.
-	// SHA-256:
-	// 10f19c5b2b8d6db711582e0e27f5116296c34fe4b313ba45f9b201a5007056cb
-	downloadURL := "https://www.releases.ubuntu.com/jammy/ubuntu-22.04.1-live-server-amd64.iso"
+	// URL of remote file.
+	// SHA-256: 9e2f2a4031b215922aa21a3695e30bbfa1f7707597834287415dbc862c6a3251
+	downloadURL := "https://golang.google.cn/dl/go1.20.1.darwin-amd64.pkg"
 
 	// Do HTTP request and get the response.
 	resp, err := http.Get(downloadURL)
@@ -120,5 +119,5 @@ func ExampleStart() {
 
 	// Output:
 	// SHA-256:
-	// 10f19c5b2b8d6db711582e0e27f5116296c34fe4b313ba45f9b201a5007056cb
+	// 9e2f2a4031b215922aa21a3695e30bbfa1f7707597834287415dbc862c6a3251
 }
