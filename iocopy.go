@@ -111,54 +111,6 @@ func (e *EventOK) Written() int64 {
 	return e.written
 }
 
-// readWrite reads data from src and write data to buf.
-func readWrite(
-	dst io.Writer,
-	src io.Reader,
-	buf []byte,
-	left int64) (written int64, newLeft int64, done bool, err error) {
-	// Check if buffer filled by previous read need write first.
-	if left > 0 {
-		n, err := dst.Write(buf[:left])
-		if err != nil {
-			return 0, 0, false, err
-		}
-
-		written += int64(n)
-	}
-
-	n, err := src.Read(buf)
-	if err != nil && err != io.EOF {
-		return 0, 0, false, err
-	}
-
-	// All done.
-	if n == 0 {
-		return written, 0, true, nil
-	} else {
-		// Write data in buffer to dst.
-		if n, err = dst.Write(buf[:n]); err != nil {
-			return 0, 0, false, err
-		}
-	}
-
-	written += int64(n)
-
-	// Read agian to see if it's done.
-	n, err = src.Read(buf)
-	if err != nil && err != io.EOF {
-		return 0, 0, false, err
-	}
-
-	// All done.
-	if n == 0 {
-		return written, 0, true, nil
-	} else {
-		// Leave n bytes for next write.
-		return written, int64(n), false, nil
-	}
-}
-
 // Start returns a channel for the caller to receive IO copy events and start a goroutine to do IO copy.
 // ctx: context.Context.
 // It can be created using context.WithCancel, context.WithDeadline,
@@ -198,13 +150,9 @@ func Start(
 
 	go func(ch chan Event) {
 		var (
-			err        error
-			n          int64
-			written    int64
-			left       int64
-			oldWritten int64
-			done       bool
-			ticker     *time.Ticker
+			written    int64        = 0
+			oldWritten int64        = 0
+			ticker     *time.Ticker = nil
 		)
 
 		defer func() {
@@ -247,17 +195,14 @@ func Start(
 				return
 
 			default:
-				// Read and write data.
-				n, left, done, err = readWrite(dst, src, buf, left)
-
-				if err != nil {
+				n, err := src.Read(buf)
+				if err != nil && err != io.EOF {
 					ch <- newEventError(err)
 					return
 				}
 
-				written += n
-
-				if done {
+				// All done.
+				if n == 0 {
 					// Stop ticker.
 					if ticker != nil {
 						ticker.Stop()
@@ -268,7 +213,14 @@ func Start(
 					ch <- newEventWritten(written)
 					ch <- newEventOK(written)
 					return
+				} else {
+					if n, err = dst.Write(buf[:n]); err != nil {
+						ch <- newEventError(err)
+						return
+					}
 				}
+
+				written += int64(n)
 			}
 		}
 
