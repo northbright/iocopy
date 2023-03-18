@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"runtime"
 	"time"
 )
 
@@ -221,6 +222,9 @@ func Start(
 				}
 
 				written += int64(n)
+
+				// Let other waiting goroutines to run.
+				runtime.Gosched()
 			}
 		}
 
