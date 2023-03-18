@@ -116,7 +116,8 @@ func readWrite(
 	dst io.Writer,
 	src io.Reader,
 	buf []byte,
-	left int64) (written int64, newLeft int64, done bool, err error) {
+	left int64,
+	readAgain bool) (written int64, newLeft int64, done bool, err error) {
 	// Check if buffer filled by previous read need write first.
 	if left > 0 {
 		n, err := dst.Write(buf[:left])
@@ -132,19 +133,23 @@ func readWrite(
 		return 0, 0, false, err
 	}
 
-	// All done.
+	// All done?
 	if n == 0 {
 		return written, 0, true, nil
-	} else {
-		// Write data in buffer to dst.
-		if n, err = dst.Write(buf[:n]); err != nil {
-			return 0, 0, false, err
-		}
+	}
+
+	// Write data in buffer to dst.
+	if n, err = dst.Write(buf[:n]); err != nil {
+		return 0, 0, false, err
 	}
 
 	written += int64(n)
 
-	// Read agian to see if it's done.
+	// Need read agian?
+	if !readAgain {
+		return written, 0, false, nil
+	}
+
 	n, err = src.Read(buf)
 	if err != nil && err != io.EOF {
 		return 0, 0, false, err
@@ -243,12 +248,24 @@ func Start(
 				if ticker != nil {
 					ticker.Stop()
 				}
+
+				// Write previous data left in the buffer.
+				n, _, _, err = readWrite(dst, src, buf, left, false)
+
+				if err != nil {
+					ch <- newEventError(err)
+					return
+				}
+
+				written += n
+
+				ch <- newEventWritten(written)
 				ch <- newEventStop(ctx.Err(), written)
 				return
 
 			default:
 				// Read and write data.
-				n, left, done, err = readWrite(dst, src, buf, left)
+				n, left, done, err = readWrite(dst, src, buf, left, true)
 
 				if err != nil {
 					ch <- newEventError(err)
@@ -263,8 +280,6 @@ func Start(
 						ticker.Stop()
 					}
 
-					// Send an EventWritten at least before
-					// send en EventOK.
 					ch <- newEventWritten(written)
 					ch <- newEventOK(written)
 					return
