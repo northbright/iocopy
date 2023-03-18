@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"time"
 )
 
@@ -180,7 +181,10 @@ func Start(
 			case <-ticker.C:
 				if written != oldWritten {
 					oldWritten = written
+					log.Printf("in ticker.C, before send EventWritten")
 					ch <- newEventWritten(written)
+					log.Printf("in ticker.C, after send EventWritten")
+
 				}
 
 			case <-ctx.Done():
@@ -210,8 +214,11 @@ func Start(
 
 					// Send an EventWritten at least before
 					// send en EventOK.
+					log.Printf("in default, before send EventWritten")
 					ch <- newEventWritten(written)
+					log.Printf("in default, after send EventWritten")
 					ch <- newEventOK(written)
+					log.Printf("in default, after send EventOK")
 					return
 				} else {
 					if n, err = dst.Write(buf[:n]); err != nil {
