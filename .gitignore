@@ -30,6 +30,8 @@
 !*.json
 !*.yml
 !*.yaml
+# Ignore config.json(dev or product env) for security purpose
+# You may use a config.example.json instead
 config.json
 
 # Cert
@@ -45,3 +47,12 @@ config.json
 
 # PDF
 !*.pdf
+
+# CSV
+!*.csv
+
+# Vue dist
+/dist
+
+# Templates
+!*.tmpl
