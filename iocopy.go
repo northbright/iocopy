@@ -119,7 +119,9 @@ func (e *EventOK) Written() int64 {
 // dst: io.Writer to copy to.
 // src: io.Reader to copy from.
 // bufSize: size of the buffer. It'll create a buffer in the new goroutine according to the buffer size.
-// interval: interval to send EventWritten event to the channel.
+// interval: It'll create a time.Ticker by given interval to send the EventWritten event to the channel during the IO copy.
+// A negative or zero duration causes it to stop the ticker immediately.
+// In this case, it'll send the EventWritten to the channel only once when IO copy succeeds.
 // You may set it to DefaultInterval.
 //
 // It returns a channel to receive IO copy events.
@@ -168,10 +170,14 @@ func Start(
 		}
 		buf := make([]byte, bufSize)
 
-		if interval <= 0 {
-			interval = DefaultInterval
+		if interval > 0 {
+			ticker = time.NewTicker(interval)
+		} else {
+			// If interval <= 0, use default interval to create the ticker
+			// and stop it immediately.
+			ticker = time.NewTicker(DefaultInterval)
+			ticker.Stop()
 		}
-		ticker = time.NewTicker(interval)
 
 		for {
 			select {
