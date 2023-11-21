@@ -123,7 +123,7 @@ func (e *EventOK) Written() int64 {
 // You may set it to DefaultInterval.
 //
 // It returns a channel to receive IO copy events.
-// There're 4 types of events will be send to the channel:
+// There're 4 types of events:
 // (1). n bytes have been written successfully.
 //
 //	It'll send an EventWritten to the channel.
