@@ -124,21 +124,18 @@ func (e *EventOK) Written() int64 {
 //
 // It returns a channel to receive IO copy events.
 // There're 4 types of events:
-// (1). n bytes have been written successfully.
 //
-//	It'll send an EventWritten to the channel.
+// (1). n bytes have been written successfully.
+// It'll send an EventWritten to the channel.
 //
 // (2). an error occured
-//
-//	It'll send an EventError to the channel and close the channel.
+// It'll send an EventError to the channel and close the channel.
 //
 // (3). IO copy stopped(context is canceled or context's deadline exceeded).
-//
-//	It'll send an EventStop to the channel and close the channel.
+// It'll send an EventStop to the channel and close the channel.
 //
 // (4). IO copy succeeded.
-//
-//	It'll send an EventOK to the channel and close the channel.
+// It'll send an EventOK to the channel and close the channel.
 //
 // You may use a for-range loop to read events from the channel.
 func Start(
