@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -120,4 +122,28 @@ func ExampleStart() {
 	// Output:
 	// SHA-256:
 	// 9e2f2a4031b215922aa21a3695e30bbfa1f7707597834287415dbc862c6a3251
+}
+
+func ExampleCopyFile() {
+	ctx := context.Background()
+	src := "iocopy.go"
+	dstDir := filepath.Join(os.TempDir(), "iocopy")
+	dst := filepath.Join(dstDir, "iocopy.go")
+	bufSize := (int64)(16 * 1024 * 1024)
+
+	n, err := iocopy.CopyFile(ctx, dst, src, bufSize)
+	if err != nil {
+		log.Printf("CopyFile() error: %v", err)
+		return
+	}
+
+	log.Printf("CopyFile() OK, %d bytes copied successfully", n)
+
+	// Remove temp file and dir.
+	if err := os.RemoveAll(dstDir); err != nil {
+		log.Printf("RemoveAll() error: %v", err)
+		return
+	}
+
+	// Output:
 }

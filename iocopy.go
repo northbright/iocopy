@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/northbright/pathelper"
 )
 
 const (
@@ -234,4 +238,65 @@ func Start(
 	}(ch)
 
 	return ch
+}
+
+// CopyFile copies from src to dst and block the caller's goroutine until copy is done.
+func CopyFile(ctx context.Context, dst, src string, bufSize int64) (int64, error) {
+	// Create dst dir if need.
+	dstDir := filepath.Dir(dst)
+	if err := pathelper.CreateDirIfNotExists(dstDir, 0755); err != nil {
+		return 0, err
+	}
+
+	w, err := os.Create(dst)
+	if err != nil {
+		return 0, err
+	}
+	defer w.Close()
+
+	r, err := os.Open(src)
+	if err != nil {
+		return 0, err
+	}
+	defer r.Close()
+
+	if bufSize < 0 {
+		bufSize = DefaultBufSize
+	}
+
+	// Start a goroutine to do IO copy.
+	ch := Start(
+		// Context
+		ctx,
+		// Writer
+		w,
+		// Reader(src)
+		r,
+		// Buffer size
+		bufSize,
+		// Interval to report written bytes
+		0)
+
+	// Read the events from the channel.
+	for event := range ch {
+		switch ev := event.(type) {
+		case *EventStop:
+			// Context is canceled or
+			// context's deadline exceeded.
+			return 0, ev.Err()
+
+		case *EventError:
+			// an error occured.
+			// Get the error.
+			return 0, ev.Err()
+
+		case *EventOK:
+			// IO copy succeeded.
+			// Get the total count of written bytes.
+			n := ev.Written()
+			return n, nil
+		}
+	}
+
+	return 0, fmt.Errorf("unknown error")
 }
