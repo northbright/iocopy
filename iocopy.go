@@ -14,7 +14,7 @@ import (
 
 const (
 	// DefaultBufSize is the default buffer size.
-	DefaultBufSize = int64(32 * 1024)
+	DefaultBufSize = uint(32 * 1024)
 
 	// DefaultInterval is the default interval to report count of written bytes.
 	DefaultInterval = 500 * time.Millisecond
@@ -148,7 +148,7 @@ func Start(
 	ctx context.Context,
 	dst io.Writer,
 	src io.Reader,
-	bufSize int64,
+	bufSize uint,
 	interval time.Duration) <-chan Event {
 	ch := make(chan Event)
 
@@ -169,7 +169,7 @@ func Start(
 			close(ch)
 		}()
 
-		if bufSize <= 0 {
+		if bufSize == 0 {
 			bufSize = DefaultBufSize
 		}
 		buf := make([]byte, bufSize)
@@ -241,7 +241,7 @@ func Start(
 }
 
 // CopyFile copies from src to dst and block the caller's goroutine until copy is done.
-func CopyFile(ctx context.Context, dst, src string, bufSize int64) (int64, error) {
+func CopyFile(ctx context.Context, dst, src string, bufSize uint) (int64, error) {
 	// Create dst dir if need.
 	dstDir := filepath.Dir(dst)
 	if err := pathelper.CreateDirIfNotExists(dstDir, 0755); err != nil {
@@ -259,10 +259,6 @@ func CopyFile(ctx context.Context, dst, src string, bufSize int64) (int64, error
 		return 0, err
 	}
 	defer r.Close()
-
-	if bufSize < 0 {
-		bufSize = DefaultBufSize
-	}
 
 	// Start a goroutine to do IO copy.
 	ch := Start(

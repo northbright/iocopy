@@ -129,7 +129,7 @@ func ExampleCopyFile() {
 	src := "iocopy.go"
 	dstDir := filepath.Join(os.TempDir(), "iocopy")
 	dst := filepath.Join(dstDir, "iocopy.go")
-	bufSize := (int64)(16 * 1024 * 1024)
+	bufSize := uint(16 * 1024 * 1024)
 
 	n, err := iocopy.CopyFile(ctx, dst, src, bufSize)
 	if err != nil {
