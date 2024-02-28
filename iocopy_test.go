@@ -39,7 +39,7 @@ func ExampleStart() {
 
 	// Get remote file size.
 	contentLength := resp.Header.Get("Content-Length")
-	total, _ := strconv.ParseInt(contentLength, 10, 64)
+	total, _ := strconv.ParseUint(contentLength, 10, 64)
 	if total <= 0 {
 		log.Printf("Content-Length <= 0: %v", total)
 		return
@@ -74,6 +74,8 @@ func ExampleStart() {
 		resp.Body,
 		// Buffer size
 		16*1024*1024,
+		// Total size, set it to 0 if it's unknown.
+		total,
 		// Interval to report written bytes
 		500*time.Millisecond)
 
@@ -84,13 +86,20 @@ func ExampleStart() {
 			// n bytes have been written successfully.
 			// Get the count of bytes.
 			n := ev.Written()
-			percent := float32(float64(n) / (float64(total) / float64(100)))
+			percent := ev.Percent()
 			log.Printf("on EventWritten: %v/%v bytes written(%.2f%%)", n, total, percent)
 
 		case *iocopy.EventStop:
 			// Context is canceled or
 			// context's deadline exceeded.
-			log.Printf("on EventStop: %v", ev.Err())
+			// Get EventWritten from EventStop.
+			ew := ev.EventWritten()
+
+			// Get the number of written bytes and percent.
+			n := ew.Written()
+			percent := ew.Percent()
+
+			log.Printf("on EventStop: %v, %v/%v bytes written(%.2f%%)", ev.Err(), n, total, percent)
 
 		case *iocopy.EventError:
 			// an error occured.
@@ -99,9 +108,12 @@ func ExampleStart() {
 
 		case *iocopy.EventOK:
 			// IO copy succeeded.
-			// Get the total count of written bytes.
-			n := ev.Written()
-			percent := float32(float64(n) / (float64(total) / float64(100)))
+			// Get EventWritten from EventOK.
+			ew := ev.EventWritten()
+
+			// Get the number of written bytes and percent.
+			n := ew.Written()
+			percent := ew.Percent()
 			log.Printf("on EventOK: %v/%v bytes written(%.2f%%)", n, total, percent)
 
 			// Get the final SHA-256 checksum of the remote file.

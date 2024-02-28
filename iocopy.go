@@ -22,7 +22,7 @@ const (
 // Currently, there're 4 types of events:
 // (1). EventWritten - n bytes have been written successfully.
 // (2). EventError - an error occurs and the goroutine exits.
-// (3). EventOK - IO copy stopped.
+// (3). EventStop - IO copy stopped.
 // (4). EventOK - IO copy succeeded.
 type Event interface {
 	// stringer
@@ -31,11 +31,15 @@ type Event interface {
 
 // EventWritten is the event that n bytes have been written successfully.
 type EventWritten struct {
-	written int64
+	written uint64
+	total   uint64
+	percent float32
 }
 
-func newEventWritten(written int64) *EventWritten {
-	return &EventWritten{written: written}
+func newEventWritten(written, total uint64) *EventWritten {
+	percent := computePercent(written, total)
+
+	return &EventWritten{written: written, total: total, percent: percent}
 }
 
 // String implements the stringer interface.
@@ -43,9 +47,21 @@ func (e *EventWritten) String() string {
 	return fmt.Sprintf("%d bytes written", e.written)
 }
 
-// Written returns the count of bytes written successfuly.
-func (e *EventWritten) Written() int64 {
+// Written returns the number of bytes written successfuly.
+func (e *EventWritten) Written() uint64 {
 	return e.written
+}
+
+// Total returns the total number of bytes to copy.
+// It's the same as total argument of Start.
+func (e *EventWritten) Total() uint64 {
+	return e.total
+}
+
+// Percent returns the percentage of the progress.
+// It's always 0 when total is 0.
+func (e *EventWritten) Percent() float32 {
+	return e.percent
 }
 
 // EventError is the event that an error occurs.
@@ -69,22 +85,26 @@ func (e *EventError) Err() error {
 
 // EventOK is the event that IO copy stopped.
 type EventStop struct {
-	err     error
-	written int64
+	err error
+	ew  *EventWritten
 }
 
-func newEventStop(err error, written int64) *EventStop {
-	return &EventStop{err: err, written: written}
+func newEventStop(err error, written, total uint64) *EventStop {
+	return &EventStop{
+		err: err,
+		ew:  newEventWritten(written, total),
+	}
 }
 
 // String implements the stringer interface.
 func (e *EventStop) String() string {
-	return fmt.Sprintf("written stopped(reason: %v, %d bytes written)", e.err, e.written)
+	return fmt.Sprintf("written stopped(reason: %v, written bytes: %d, total: %d)", e.err, e.ew.Written(), e.ew.Total())
 }
 
-// Written returns the count of bytes written successfuly.
-func (e *EventStop) Written() int64 {
-	return e.written
+// EventWritten returns the contained EventWritten event,
+// which can be used to call Written, Total, Percent method on it.
+func (e *EventStop) EventWritten() *EventWritten {
+	return e.ew
 }
 
 // Err returns the the context error that explains why IO copying is stopped.
@@ -95,21 +115,31 @@ func (e *EventStop) Err() error {
 
 // EventOK is the event that IO copy succeeded.
 type EventOK struct {
-	written int64
+	ew *EventWritten
 }
 
-func newEventOK(written int64) *EventOK {
-	return &EventOK{written: written}
+func newEventOK(written, total uint64) *EventOK {
+	return &EventOK{ew: newEventWritten(written, total)}
 }
 
 // String implements the stringer interface.
 func (e *EventOK) String() string {
-	return fmt.Sprintf("written OK(total: %d bytes)", e.written)
+	return fmt.Sprintf("copy OK(written bytes: %d, total: %d bytes)", e.ew.Written(), e.ew.Total())
 }
 
-// Written returns the count of bytes written successfuly.
-func (e *EventOK) Written() int64 {
-	return e.written
+// EventWritten returns the contained EventWritten event,
+// which can be used to call Written, Total, Percent method on it.
+func (e *EventOK) EventWritten() *EventWritten {
+	return e.ew
+}
+
+// computePercent returns the percentage.
+func computePercent(written, total uint64) float32 {
+	if total == 0 {
+		return 0
+	}
+
+	return float32(float64(written) / (float64(total) / float64(100)))
 }
 
 // Start returns a channel for the caller to receive IO copy events and start a goroutine to do IO copy.
@@ -119,13 +149,14 @@ func (e *EventOK) Written() int64 {
 // dst: io.Writer to copy to.
 // src: io.Reader to copy from.
 // bufSize: size of the buffer. It'll create a buffer in the new goroutine according to the buffer size.
+// total: total number of bytes to copy. Set it to 0 if it's unknown.
 // interval: It'll create a time.Ticker by given interval to send the EventWritten event to the channel during the IO copy.
 // A negative or zero duration causes it to stop the ticker immediately.
 // In this case, it'll send the EventWritten to the channel only once when IO copy succeeds.
 // You may set it to DefaultInterval.
 //
 // It returns a channel to receive IO copy events.
-// There're 4 types of events:
+// Available events:
 //
 // (1). n bytes have been written successfully.
 // It'll send an EventWritten to the channel.
@@ -145,13 +176,14 @@ func Start(
 	dst io.Writer,
 	src io.Reader,
 	bufSize uint,
+	total uint64,
 	interval time.Duration) <-chan Event {
 	ch := make(chan Event)
 
 	go func(ch chan Event) {
 		var (
-			written    int64        = 0
-			oldWritten int64        = 0
+			written    uint64       = 0
+			oldWritten uint64       = 0
 			ticker     *time.Ticker = nil
 		)
 
@@ -184,7 +216,7 @@ func Start(
 			case <-ticker.C:
 				if written != oldWritten {
 					oldWritten = written
-					ch <- newEventWritten(written)
+					ch <- newEventWritten(written, total)
 				}
 
 			case <-ctx.Done():
@@ -195,7 +227,7 @@ func Start(
 				if ticker != nil {
 					ticker.Stop()
 				}
-				ch <- newEventStop(ctx.Err(), written)
+				ch <- newEventStop(ctx.Err(), written, total)
 				return
 
 			default:
@@ -214,8 +246,8 @@ func Start(
 
 					// Send an EventWritten at least before
 					// send en EventOK.
-					ch <- newEventWritten(written)
-					ch <- newEventOK(written)
+					ch <- newEventWritten(written, total)
+					ch <- newEventOK(written, total)
 					return
 				} else {
 					if n, err = dst.Write(buf[:n]); err != nil {
@@ -224,7 +256,7 @@ func Start(
 					}
 				}
 
-				written += int64(n)
+				written += uint64(n)
 
 				// Let other waiting goroutines to run.
 				runtime.Gosched()
