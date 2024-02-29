@@ -28,7 +28,7 @@ func computePercent(total, written uint64, done bool) float32 {
 	return float32(float64(written) / (float64(total) / float64(100)))
 }
 
-// getRespAndSize returns the HTTP response and size of remote file.
+// getRespAndSize returns the HTTP response and size of the remote file.
 func getRespAndSize(remoteURL string, written uint64) (*http.Response, uint64, error) {
 	// Create a HTTP client.
 	client := http.Client{}
@@ -51,13 +51,13 @@ func getRespAndSize(remoteURL string, written uint64) (*http.Response, uint64, e
 		return nil, 0, err
 	}
 
-	// Check status code.
+	// Check the status code.
 	if resp.StatusCode != 200 && resp.StatusCode != 206 {
 		log.Printf("status code is not 200 or 206: %v", resp.StatusCode)
 		return nil, 0, fmt.Errorf("status code is not 200 or 206")
 	}
 
-	// Get remote file size.
+	// Get the remote file size.
 	contentLength := resp.Header.Get("Content-Length")
 	total, _ := strconv.ParseUint(contentLength, 10, 64)
 	if total <= 0 {
@@ -83,11 +83,11 @@ func ExampleStart() {
 	// It shows how to read events and process them from the event channel.
 	// ----------------------------------------------------------------------
 
-	// URL of remote file.
+	// URL of the remote file.
 	// SHA-256: 9e2f2a4031b215922aa21a3695e30bbfa1f7707597834287415dbc862c6a3251
 	downloadURL := "https://golang.google.cn/dl/go1.20.1.darwin-amd64.pkg"
 
-	// Do HTTP request and get the HTTP response body and content length.
+	// Do HTTP request and get the HTTP response body and the content length.
 	resp, total, err := getRespAndSize(downloadURL, 0)
 	if err != nil {
 		log.Printf("getRespAndSize() error: %v", err)
@@ -104,7 +104,7 @@ func ExampleStart() {
 	ctx := context.Background()
 
 	// Start a goroutine to do IO copy.
-	// Read from response.Body and write to hash.Hash to compute hash.
+	// Read from response.Body and write to an hash.Hash to compute the hash.
 	ch := iocopy.Start(
 		// Context
 		ctx,
@@ -114,7 +114,7 @@ func ExampleStart() {
 		resp.Body,
 		// Buffer size
 		16*1024*1024,
-		// Interval to report written bytes
+		// Interval to report the number of written bytes
 		80*time.Millisecond)
 
 	log.Printf("Example 1: IO copy gouroutine started.")
@@ -160,7 +160,7 @@ func ExampleStart() {
 	// It shows how to stop the IO copy and save the state.
 	// ----------------------------------------------------------------------
 
-	// Do HTTP request and get the HTTP response body and content length.
+	// Do HTTP request and get the HTTP response body and the content length.
 	resp2, total, err := getRespAndSize(downloadURL, 0)
 	if err != nil {
 		log.Printf("getRespAndSize() error: %v", err)
@@ -178,7 +178,7 @@ func ExampleStart() {
 	defer cancel()
 
 	// Start a goroutine to do IO copy.
-	// Read from response.Body and write to hash.Hash to compute hash.
+	// Read from response.Body and write to an hash.Hash to compute the hash.
 	ch2 := iocopy.Start(
 		// Context
 		ctx2,
@@ -188,7 +188,7 @@ func ExampleStart() {
 		resp2.Body,
 		// Buffer size
 		16*1024*1024,
-		// Interval to report written bytes
+		// Interval to report the number of written bytes
 		80*time.Millisecond)
 
 	log.Printf("Example 2 - Part I: IO copy gouroutine started.")
@@ -223,7 +223,6 @@ func ExampleStart() {
 
 		case *iocopy.EventError:
 			// an error occured.
-			// Get the error.
 			log.Printf("on EventError: %v", ev.Err())
 
 		case *iocopy.EventOK:
@@ -253,7 +252,7 @@ func ExampleStart() {
 	// It shows how to resume the IO copy with the saved state.
 	// ----------------------------------------------------------------------
 
-	// Do HTTP request and get the HTTP response body and content length.
+	// Do HTTP request and get the HTTP response body and the content length.
 	resp3, total, err := getRespAndSize(downloadURL, written)
 	if err != nil {
 		log.Printf("getRespAndSize() error: %v", err)
@@ -279,7 +278,7 @@ func ExampleStart() {
 	ctx3 := context.Background()
 
 	// Start a goroutine to do IO copy.
-	// Read from response.Body and write to hash.Hash to compute hash.
+	// Read from response.Body and write to an hash.Hash to compute the hash.
 	ch3 := iocopy.Start(
 		// Context
 		ctx3,
@@ -289,7 +288,7 @@ func ExampleStart() {
 		resp3.Body,
 		// Buffer size
 		16*1024*1024,
-		// Interval to report written bytes
+		// Interval to report the number of written bytes
 		80*time.Millisecond)
 
 	log.Printf("Example 2 - Part II: IO copy gouroutine started.")
