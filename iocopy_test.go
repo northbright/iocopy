@@ -37,9 +37,11 @@ func getRespAndSize(remoteURL string, written uint64) (*http.Response, uint64, e
 		return nil, 0, err
 	}
 
-	// Set range header.
-	bytesRange := fmt.Sprintf("bytes=%d-", written)
-	req.Header.Add("range", bytesRange)
+	// Set range header to resume downloading if need.
+	if written > 0 {
+		bytesRange := fmt.Sprintf("bytes=%d-", written)
+		req.Header.Add("range", bytesRange)
+	}
 
 	// Do HTTP request.
 	// resp.Body(io.ReadCloser) will be closed
