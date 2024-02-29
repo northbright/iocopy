@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	// DefBufSize is the default buffer size.
-	DefBufSize = uint(32 * 1024)
+	// DefaultBufSize is the default buffer size.
+	DefaultBufSize = uint(32 * 1024)
 
 	// DefaultInterval is the default interval to report count of written bytes.
 	DefaultInterval = 500 * time.Millisecond
@@ -171,7 +171,7 @@ func Start(
 		}()
 
 		if bufSize == 0 {
-			bufSize = DefBufSize
+			bufSize = DefaultBufSize
 		}
 		buf := make([]byte, bufSize)
 
