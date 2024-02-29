@@ -114,7 +114,7 @@ func ExampleStart() {
 		resp.Body,
 		// Buffer size
 		16*1024*1024,
-		// Interval to report the number of written bytes
+		// Interval to report the number of bytes copied
 		80*time.Millisecond)
 
 	log.Printf("Example 1: IO copy gouroutine started.")
@@ -188,7 +188,7 @@ func ExampleStart() {
 		resp2.Body,
 		// Buffer size
 		16*1024*1024,
-		// Interval to report the number of written bytes
+		// Interval to report the number of bytes copied
 		80*time.Millisecond)
 
 	log.Printf("Example 2 - Part I: IO copy gouroutine started.")
@@ -208,7 +208,7 @@ func ExampleStart() {
 			// Get EventWritten from EventStop.
 			ew := ev.EventWritten()
 
-			// Save the number of the written bytes.
+			// Save the number of bytes copied.
 			written = ew.Written()
 			oldWritten = written
 			percent = computePercent(total, written, false)
@@ -288,7 +288,7 @@ func ExampleStart() {
 		resp3.Body,
 		// Buffer size
 		16*1024*1024,
-		// Interval to report the number of written bytes
+		// Interval to report the number of bytes copied
 		80*time.Millisecond)
 
 	log.Printf("Example 2 - Part II: IO copy gouroutine started.")

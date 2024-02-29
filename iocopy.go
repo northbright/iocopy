@@ -12,7 +12,7 @@ const (
 	// DefaultBufSize is the default buffer size.
 	DefaultBufSize = uint(32 * 1024)
 
-	// DefaultInterval is the default interval to report count of written bytes.
+	// DefaultInterval is the default interval to report the number of bytes copied.
 	DefaultInterval = 500 * time.Millisecond
 )
 
