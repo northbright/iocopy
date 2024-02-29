@@ -219,7 +219,7 @@ func ExampleStart() {
 			marshaler, _ := hash2.(encoding.BinaryMarshaler)
 			state, _ = marshaler.MarshalBinary()
 
-			log.Printf("IO copy is stopped. written: %d, save hash state: %X", written, state)
+			log.Printf("IO copy is stopped. written: %d, saved hash state: %X", written, state)
 
 		case *iocopy.EventError:
 			// an error occured.
