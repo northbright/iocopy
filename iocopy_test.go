@@ -53,8 +53,8 @@ func getRespAndSize(remoteURL string, written uint64) (*http.Response, uint64, e
 
 	// Check status code.
 	if resp.StatusCode != 200 && resp.StatusCode != 206 {
-		log.Printf("status code is not 200 or 206")
-		return nil, 0, err
+		log.Printf("status code is not 200 or 206: %v", resp.StatusCode)
+		return nil, 0, fmt.Errorf("status code is not 200 or 206")
 	}
 
 	// Get remote file size.
@@ -115,7 +115,7 @@ func ExampleStart() {
 		// Buffer size
 		16*1024*1024,
 		// Interval to report written bytes
-		200*time.Millisecond)
+		80*time.Millisecond)
 
 	log.Printf("Example 1: IO copy gouroutine started.")
 
@@ -174,7 +174,7 @@ func ExampleStart() {
 	hash2 := sha256.New()
 
 	// create a context with timeout to emulate the users' cancalation of the IO copy.
-	ctx2, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	ctx2, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
 
 	// Start a goroutine to do IO copy.
@@ -189,7 +189,7 @@ func ExampleStart() {
 		// Buffer size
 		16*1024*1024,
 		// Interval to report written bytes
-		200*time.Millisecond)
+		80*time.Millisecond)
 
 	log.Printf("Example 2 - Part I: IO copy gouroutine started.")
 
@@ -257,6 +257,7 @@ func ExampleStart() {
 	resp3, total, err := getRespAndSize(downloadURL, written)
 	if err != nil {
 		log.Printf("getRespAndSize() error: %v", err)
+		log.Printf("it seems IO copy is done before timeout")
 		return
 	}
 
@@ -289,7 +290,7 @@ func ExampleStart() {
 		// Buffer size
 		16*1024*1024,
 		// Interval to report written bytes
-		200*time.Millisecond)
+		80*time.Millisecond)
 
 	log.Printf("Example 2 - Part II: IO copy gouroutine started.")
 
