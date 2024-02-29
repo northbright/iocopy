@@ -124,14 +124,12 @@ func ExampleStart() {
 		switch ev := event.(type) {
 		case *iocopy.EventWritten:
 			// n bytes have been written successfully.
-			// Get the count of bytes.
 			written = ev.Written()
 			percent = computePercent(total, written, false)
 			log.Printf("on EventWritten: %v/%v bytes written(%.2f%%)", written, total, percent)
 
 		case *iocopy.EventError:
 			// an error occured.
-			// Get the error.
 			log.Printf("on EventError: %v", ev.Err())
 
 		case *iocopy.EventOK:
@@ -139,7 +137,6 @@ func ExampleStart() {
 			// Get EventWritten from EventOK.
 			ew := ev.EventWritten()
 
-			// Get the number of written bytes and percent.
 			written = ew.Written()
 			percent = computePercent(total, written, true)
 			log.Printf("on EventOK: %v/%v bytes written(%.2f%%)", written, total, percent)
@@ -201,7 +198,6 @@ func ExampleStart() {
 		switch ev := event.(type) {
 		case *iocopy.EventWritten:
 			// n bytes have been written successfully.
-			// Get the count of bytes.
 			written = ev.Written()
 			percent = computePercent(total, written, false)
 			log.Printf("on EventWritten: %v/%v bytes written(%.2f%%)", written, total, percent)
@@ -212,12 +208,9 @@ func ExampleStart() {
 			// Get EventWritten from EventStop.
 			ew := ev.EventWritten()
 
-			// Get the number of written bytes and percent.
+			// Save the number of the written bytes.
 			written = ew.Written()
-
-			// Save the number of written bytes and total bytes.
 			oldWritten = written
-
 			percent = computePercent(total, written, false)
 
 			log.Printf("on EventStop: %v, %v/%v bytes written(%.2f%%)", ev.Err(), written, total, percent)
@@ -238,7 +231,6 @@ func ExampleStart() {
 			// Get EventWritten from EventOK.
 			ew := ev.EventWritten()
 
-			// Get the number of written bytes and percent.
 			written = ew.Written()
 			percent = computePercent(total, written, true)
 			log.Printf("on EventOK: %v/%v bytes written(%.2f%%)", written, total, percent)
@@ -306,14 +298,12 @@ func ExampleStart() {
 		switch ev := event.(type) {
 		case *iocopy.EventWritten:
 			// n bytes have been written successfully.
-			// Get the count of bytes and update the total number of written bytes.
 			written = oldWritten + ev.Written()
 			percent = computePercent(total, written, false)
 			log.Printf("on EventWritten: %v/%v bytes written(%.2f%%)", written, total, percent)
 
 		case *iocopy.EventError:
 			// an error occured.
-			// Get the error.
 			log.Printf("on EventError: %v", ev.Err())
 
 		case *iocopy.EventOK:
@@ -321,7 +311,6 @@ func ExampleStart() {
 			// Get EventWritten from EventOK.
 			ew := ev.EventWritten()
 
-			// Get the number of written bytes and percent.z
 			written = oldWritten + ew.Written()
 			percent = computePercent(total, written, true)
 			log.Printf("on EventOK: %v/%v bytes written(%.2f%%)", written, total, percent)
