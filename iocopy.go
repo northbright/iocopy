@@ -117,6 +117,95 @@ func (e *EventOK) EventWritten() *EventWritten {
 	return e.ew
 }
 
+func cp(
+	ctx context.Context,
+	dst io.Writer,
+	src io.Reader,
+	bufSize uint,
+	interval time.Duration,
+	ch chan Event) {
+	var (
+		written    uint64       = 0
+		oldWritten uint64       = 0
+		ticker     *time.Ticker = nil
+	)
+
+	defer func() {
+		// Stop ticker.
+		if ticker != nil {
+			ticker.Stop()
+		}
+
+		// Close the event channel.
+		close(ch)
+	}()
+
+	if bufSize == 0 {
+		bufSize = DefaultBufSize
+	}
+	buf := make([]byte, bufSize)
+
+	if interval > 0 {
+		ticker = time.NewTicker(interval)
+	} else {
+		// If interval <= 0, use default interval to create the ticker
+		// and stop it immediately.
+		ticker = time.NewTicker(DefaultInterval)
+		ticker.Stop()
+	}
+
+	for {
+		select {
+		case <-ticker.C:
+			if written != oldWritten {
+				oldWritten = written
+				ch <- newEventWritten(written)
+			}
+
+		case <-ctx.Done():
+			// Context is canceled or
+			// context's deadline exceeded.
+
+			// Stop ticker.
+			if ticker != nil {
+				ticker.Stop()
+			}
+			ch <- newEventStop(ctx.Err(), written)
+			return
+
+		default:
+			n, err := src.Read(buf)
+			if err != nil && err != io.EOF {
+				ch <- newEventError(err)
+				return
+			}
+
+			// All done.
+			if n == 0 {
+				// Stop ticker.
+				if ticker != nil {
+					ticker.Stop()
+				}
+
+				// Send an EventOK.
+				ch <- newEventOK(written)
+				return
+			} else {
+				if n, err = dst.Write(buf[:n]); err != nil {
+					ch <- newEventError(err)
+					return
+				}
+			}
+
+			written += uint64(n)
+
+			// Let other waiting goroutines to run.
+			runtime.Gosched()
+		}
+	}
+
+}
+
 // Start returns a channel for the caller to receive IO copy events and start a goroutine to do IO copy.
 // ctx: context.Context.
 // It can be created using context.WithCancel, context.WithDeadline,
@@ -153,88 +242,7 @@ func Start(
 	interval time.Duration) <-chan Event {
 	ch := make(chan Event)
 
-	go func(ch chan Event) {
-		var (
-			written    uint64       = 0
-			oldWritten uint64       = 0
-			ticker     *time.Ticker = nil
-		)
-
-		defer func() {
-			// Stop ticker.
-			if ticker != nil {
-				ticker.Stop()
-			}
-
-			// Close the event channel.
-			close(ch)
-		}()
-
-		if bufSize == 0 {
-			bufSize = DefaultBufSize
-		}
-		buf := make([]byte, bufSize)
-
-		if interval > 0 {
-			ticker = time.NewTicker(interval)
-		} else {
-			// If interval <= 0, use default interval to create the ticker
-			// and stop it immediately.
-			ticker = time.NewTicker(DefaultInterval)
-			ticker.Stop()
-		}
-
-		for {
-			select {
-			case <-ticker.C:
-				if written != oldWritten {
-					oldWritten = written
-					ch <- newEventWritten(written)
-				}
-
-			case <-ctx.Done():
-				// Context is canceled or
-				// context's deadline exceeded.
-
-				// Stop ticker.
-				if ticker != nil {
-					ticker.Stop()
-				}
-				ch <- newEventStop(ctx.Err(), written)
-				return
-
-			default:
-				n, err := src.Read(buf)
-				if err != nil && err != io.EOF {
-					ch <- newEventError(err)
-					return
-				}
-
-				// All done.
-				if n == 0 {
-					// Stop ticker.
-					if ticker != nil {
-						ticker.Stop()
-					}
-
-					// Send an EventOK.
-					ch <- newEventOK(written)
-					return
-				} else {
-					if n, err = dst.Write(buf[:n]); err != nil {
-						ch <- newEventError(err)
-						return
-					}
-				}
-
-				written += uint64(n)
-
-				// Let other waiting goroutines to run.
-				runtime.Gosched()
-			}
-		}
-
-	}(ch)
+	go cp(ctx, dst, src, bufSize, interval, ch)
 
 	return ch
 }
