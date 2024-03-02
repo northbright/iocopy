@@ -386,10 +386,10 @@ func Start(
 // (1). Users should save the state and the number of bytes copied after the IO copy stopped(e.g. timeout or user canceled).
 // (2). Call StartWithProgress again, make dst and src load the saved state or set the offset according to number of the bytes to copied.
 //
-// A new type of event: EventProgress will be send to the channel.
-// It can be used to get the current and total percentage.
-// Current percentage: percentage for the current running IO copy goroutine.
-// Total percentage: percentage for the whole IO copy which may be separated into multiple sub IO copies due to users' stopping / resuming the IO copy.
+// A new event: EventProgress will be sent to the channel when progress was updated.
+// Call CurrentPercent and TotalPercent on the event to get the percentages.
+// Current percentage: percentage of the current running IO copy.
+// Total percentage: percentage of the whole IO copy which may be separated into multiple sub IO copies due to users' stopping / resuming the IO copy.
 // See Start for more information.
 func StartWithProgress(
 	ctx context.Context,
