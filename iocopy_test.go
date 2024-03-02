@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -337,4 +339,31 @@ func ExampleStartWithProgress() {
 	// Output:
 	// SHA-256:
 	// 9e2f2a4031b215922aa21a3695e30bbfa1f7707597834287415dbc862c6a3251
+}
+
+func ExampleCopyFile() {
+	ctx := context.Background()
+	dst := filepath.Join(os.TempDir(), "iocopy.go")
+	src := "iocopy.go"
+	bufSize := iocopy.DefaultBufSize
+
+	log.Printf("dst: %v", dst)
+
+	copied, err := iocopy.CopyFile(
+		ctx,
+		dst,
+		src,
+		bufSize,
+		func(written, total uint64, percent float32) {
+			log.Printf("on progress: %d/%d(%.2f%%) bytes written", written, total, percent)
+		})
+
+	if err != nil {
+		log.Printf("CopyFile() error: %v", err)
+		return
+	}
+
+	log.Printf("CopyFile() succeed, %d bytes copied.", copied)
+
+	// Output:
 }

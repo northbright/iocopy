@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"runtime"
 	"time"
 )
@@ -404,4 +405,71 @@ func StartWithProgress(
 	go cp(ctx, dst, src, bufSize, interval, true, nBytesToCopy, nBytesCopied, ch)
 
 	return ch
+}
+
+type OnProgress func(written, total uint64, percent float32)
+
+func CopyFile(
+	ctx context.Context,
+	dst, src string,
+	bufSize uint,
+	onProgress OnProgress) (uint64, error) {
+
+	ch := make(chan Event)
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return 0, err
+	}
+	defer dstFile.Close()
+
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return 0, err
+	}
+	defer srcFile.Close()
+
+	fi, err := srcFile.Stat()
+	if err != nil {
+		return 0, err
+	}
+
+	// Check if it's a regular file.
+	if !fi.Mode().IsRegular() {
+		return 0, fmt.Errorf("not regular file")
+	}
+
+	total := uint64(fi.Size())
+
+	go cp(ctx, dstFile, srcFile, bufSize, DefaultInterval, true, total, 0, ch)
+
+	for event := range ch {
+		switch ev := event.(type) {
+		case *EventWritten:
+			// n bytes have been written successfully.
+
+		case *EventProgress:
+			written := ev.Written()
+			if onProgress != nil {
+				onProgress(written, total, ev.TotalPercent())
+			}
+		case *EventStop:
+			// Context is canceled or
+			// context's deadline exceeded.
+			written := ev.Written()
+			return written, ev.Err()
+
+		case *EventError:
+			// an error occured.
+			return 0, err
+
+		case *EventOK:
+			// IO copy succeeded.
+			written := ev.Written()
+			return written, nil
+
+		}
+	}
+
+	return 0, fmt.Errorf("unknown error")
 }
