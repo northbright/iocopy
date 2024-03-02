@@ -19,11 +19,12 @@ const (
 // Event is the interface that wraps String method.
 // When Start is called, it'll return a channel for the caller to receive
 // IO copy related events.
-// Currently, there're 4 types of events:
+// Available events:
 // (1). EventWritten - n bytes have been written successfully.
 // (2). EventError - an error occurs and the goroutine exits.
 // (3). EventStop - IO copy stopped.
 // (4). EventOK - IO copy succeeded.
+// (5). EventProgress - IO copy progress updated.
 type Event interface {
 	// stringer
 	String() string
@@ -85,10 +86,9 @@ func (e *EventStop) String() string {
 	return fmt.Sprintf("written stopped(reason: %v, written bytes: %d)", e.err, e.ew.Written())
 }
 
-// EventWritten returns the contained EventWritten event,
-// which can be used to call Written, Total, Percent method on it.
-func (e *EventStop) EventWritten() *EventWritten {
-	return e.ew
+// Written returns the number of bytes written successfuly.
+func (e *EventStop) Written() uint64 {
+	return e.ew.Written()
 }
 
 // Err returns the the context error that explains why IO copying is stopped.
@@ -111,10 +111,104 @@ func (e *EventOK) String() string {
 	return fmt.Sprintf("copy OK(written bytes: %d", e.ew.Written())
 }
 
-// EventWritten returns the contained EventWritten event,
-// which can be used to call Written, Total, Percent method on it.
-func (e *EventOK) EventWritten() *EventWritten {
-	return e.ew
+// Written returns the number of bytes written successfuly.
+func (e *EventOK) Written() uint64 {
+	return e.ew.Written()
+}
+
+// EventProgress is the event that IO copy progress updated.
+type EventProgress struct {
+	ew             *EventWritten
+	currentPercent float32
+	totalPercent   float32
+}
+
+func newEventProgress(
+	written uint64,
+	currentPercent float32,
+	totalPercent float32) *EventProgress {
+	return &EventProgress{
+		ew:             newEventWritten(written),
+		currentPercent: currentPercent,
+		totalPercent:   totalPercent}
+}
+
+// String implements the stringer interface.
+func (e *EventProgress) String() string {
+	return fmt.Sprintf("progress updated, %d bytes written, current: %.2f%%, total: %.2f%%",
+		e.Written(),
+		e.currentPercent,
+		e.totalPercent)
+}
+
+// Written returns the number of bytes written successfuly.
+func (e *EventProgress) Written() uint64 {
+	return e.ew.Written()
+}
+
+// EventWritten returns the current percentage of the copy progress.
+// Current percentage may NOT be the same as total percentage. e.g. Resume an IO copy.
+func (e *EventProgress) CurrentPercent() float32 {
+	return e.currentPercent
+}
+
+// EventWritten returns the total percentage of the copy progress.
+func (e *EventProgress) TotalPercent() float32 {
+	return e.totalPercent
+}
+
+// ComputePercent returns the current and total percentage.
+// It assumes that nBytesToCopy + nBytesCopied = total number of bytes of the source.
+// Current percentage: percentage for the current running IO copy goroutine.
+// Total percentage: percentage for the whole IO copy which may be separated into multiple sub IO copies due to users' stopping / resuming the IO copy.
+func ComputePercent(nBytesToCopy, nBytesCopied, written uint64, done bool) (currentPercent float32, totalPercent float32) {
+	total := nBytesToCopy + nBytesCopied
+
+	if done {
+		// Return 100 percent when copy is done,
+		// even if total is 0.
+		return 100, 100
+	}
+
+	if total == 0 {
+		return 0, 0
+	}
+
+	if nBytesToCopy == 0 {
+		currentPercent = 0
+	} else {
+		currentPercent = float32(float64(written) / (float64(nBytesToCopy) / float64(100)))
+	}
+
+	totalPercent = float32(float64(nBytesCopied+written) / (float64(total) / float64(100)))
+
+	return currentPercent, totalPercent
+}
+
+// updateProgress returns the new current and total percent, send an EventProgress event to the channel if the progress was updated.
+func updateProgress(withProgress bool, nBytesToCopy, nBytesCopied, written uint64, done bool, oldCurrentPercent, oldTotalPercent *float32, ch chan<- Event) {
+	if !withProgress {
+		return
+	}
+	currentPercent, totalPercent := ComputePercent(
+		nBytesToCopy,
+		nBytesCopied,
+		written,
+		done)
+
+	changed := false
+	if currentPercent != *oldCurrentPercent {
+		*oldCurrentPercent = currentPercent
+		changed = true
+	}
+	if totalPercent != *oldTotalPercent {
+		*oldTotalPercent = totalPercent
+		changed = true
+	}
+
+	if changed {
+		ch <- newEventProgress(written, currentPercent, totalPercent)
+	}
 }
 
 func cp(
@@ -123,11 +217,16 @@ func cp(
 	src io.Reader,
 	bufSize uint,
 	interval time.Duration,
+	withProgress bool,
+	nBytesToCopy uint64,
+	nBytesCopied uint64,
 	ch chan Event) {
 	var (
-		written    uint64       = 0
-		oldWritten uint64       = 0
-		ticker     *time.Ticker = nil
+		written           uint64       = 0
+		oldWritten        uint64       = 0
+		oldCurrentPercent float32      = 0
+		oldTotalPercent   float32      = 0
+		ticker            *time.Ticker = nil
 	)
 
 	defer func() {
@@ -160,6 +259,17 @@ func cp(
 			if written != oldWritten {
 				oldWritten = written
 				ch <- newEventWritten(written)
+
+				// Update progress.
+				updateProgress(
+					withProgress,
+					nBytesToCopy,
+					nBytesCopied,
+					written,
+					false,
+					&oldCurrentPercent,
+					&oldTotalPercent,
+					ch)
 			}
 
 		case <-ctx.Done():
@@ -171,6 +281,18 @@ func cp(
 				ticker.Stop()
 			}
 			ch <- newEventStop(ctx.Err(), written)
+
+			// Update progress.
+			updateProgress(
+				withProgress,
+				nBytesToCopy,
+				nBytesCopied,
+				written,
+				false,
+				&oldCurrentPercent,
+				&oldTotalPercent,
+				ch)
+
 			return
 
 		default:
@@ -189,6 +311,18 @@ func cp(
 
 				// Send an EventOK.
 				ch <- newEventOK(written)
+
+				// Update progress.
+				updateProgress(
+					withProgress,
+					nBytesToCopy,
+					nBytesCopied,
+					written,
+					true,
+					&oldCurrentPercent,
+					&oldTotalPercent,
+					ch)
+
 				return
 			} else {
 				if n, err = dst.Write(buf[:n]); err != nil {
@@ -220,7 +354,6 @@ func cp(
 //
 // It returns a channel to receive IO copy events.
 // Available events:
-//
 // (1). n bytes have been written successfully.
 // It'll send an EventWritten to the channel.
 //
@@ -242,7 +375,33 @@ func Start(
 	interval time.Duration) <-chan Event {
 	ch := make(chan Event)
 
-	go cp(ctx, dst, src, bufSize, interval, ch)
+	go cp(ctx, dst, src, bufSize, interval, false, 0, 0, ch)
+
+	return ch
+}
+
+// StartWithProgress returns a channel for the caller to receive IO copy events and start a goroutine to do IO copy.
+// It's an wrapper of Start and most of the parameters are the same.
+// To resume an IO copy:
+// (1). Users should save the state and the number of bytes copied after the IO copy stopped(e.g. timeout or user canceled).
+// (2). Call StartWithProgress again, make dst and src load the saved state or set the offset according to number of the bytes to copied.
+//
+// A new type of event: EventProgress will be send to the channel.
+// It can be used to get the current and total percentage.
+// Current percentage: percentage for the current running IO copy goroutine.
+// Total percentage: percentage for the whole IO copy which may be separated into multiple sub IO copies due to users' stopping / resuming the IO copy.
+// See Start for more information.
+func StartWithProgress(
+	ctx context.Context,
+	dst io.Writer,
+	src io.Reader,
+	bufSize uint,
+	interval time.Duration,
+	nBytesToCopy uint64,
+	nBytesCopied uint64) <-chan Event {
+	ch := make(chan Event)
+
+	go cp(ctx, dst, src, bufSize, interval, true, nBytesToCopy, nBytesCopied, ch)
 
 	return ch
 }

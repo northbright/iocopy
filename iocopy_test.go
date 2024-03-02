@@ -13,21 +13,6 @@ import (
 	"github.com/northbright/iocopy"
 )
 
-// computePercent returns the percentage.
-func computePercent(total, written uint64, done bool) float32 {
-	if done {
-		// Return 100 percent when copy is done,
-		// even if written and total are both 0.
-		return 100
-	}
-
-	if total == 0 {
-		return 0
-	}
-
-	return float32(float64(written) / (float64(total) / float64(100)))
-}
-
 // getRespAndSize returns the HTTP response and size of the remote file.
 func getRespAndSize(remoteURL string, written uint64) (*http.Response, uint64, error) {
 	// Create a HTTP client.
@@ -70,14 +55,10 @@ func getRespAndSize(remoteURL string, written uint64) (*http.Response, uint64, e
 
 func ExampleStart() {
 	var (
-		total      uint64
-		written    uint64
-		oldWritten uint64
-		percent    float32
-		state      []byte
+		written uint64
 	)
 
-	// Example 1
+	// Example of iocopy.Start().
 	// ----------------------------------------------------------------------
 	// It reads a remote file and calculates its SHA-256 hash.
 	// It shows how to read events and process them from the event channel.
@@ -88,7 +69,7 @@ func ExampleStart() {
 	downloadURL := "https://golang.google.cn/dl/go1.20.1.darwin-amd64.pkg"
 
 	// Do HTTP request and get the HTTP response body and the content length.
-	resp, total, err := getRespAndSize(downloadURL, 0)
+	resp, _, err := getRespAndSize(downloadURL, 0)
 	if err != nil {
 		log.Printf("getRespAndSize() error: %v", err)
 		return
@@ -117,7 +98,7 @@ func ExampleStart() {
 		// Interval to report the number of bytes copied
 		80*time.Millisecond)
 
-	log.Printf("Example 1: IO copy gouroutine started.")
+	log.Printf("Example of Start(): IO copy gouroutine started.")
 
 	// Read the events from the channel.
 	for event := range ch {
@@ -125,8 +106,7 @@ func ExampleStart() {
 		case *iocopy.EventWritten:
 			// n bytes have been written successfully.
 			written = ev.Written()
-			percent = computePercent(total, written, false)
-			log.Printf("on EventWritten: %v/%v bytes written(%.2f%%)", written, total, percent)
+			log.Printf("on EventWritten: %d bytes written", written)
 
 		case *iocopy.EventError:
 			// an error occured.
@@ -134,12 +114,8 @@ func ExampleStart() {
 
 		case *iocopy.EventOK:
 			// IO copy succeeded.
-			// Get EventWritten from EventOK.
-			ew := ev.EventWritten()
-
-			written = ew.Written()
-			percent = computePercent(total, written, true)
-			log.Printf("on EventOK: %v/%v bytes written(%.2f%%)", written, total, percent)
+			written = ev.Written()
+			log.Printf("on EventOK: %d bytes written", written)
 
 			// Get the final SHA-256 checksum of the remote file.
 			checksum := hash.Sum(nil)
@@ -152,18 +128,136 @@ func ExampleStart() {
 	// (2). iocopy.EventStop received.
 	// (3). iocopy.EventOK received.
 	// The for-range loop exits when the channel is closed.
-	log.Printf("Example 1: IO copy gouroutine exited and the event channel is closed")
+	log.Printf("Example of Start(): IO copy gouroutine exited and the event channel is closed")
 
-	// Example 2 - Part I.
+	// Output:
+	// SHA-256:
+	// 9e2f2a4031b215922aa21a3695e30bbfa1f7707597834287415dbc862c6a3251
+}
+
+func ExampleStartWithProgress() {
+	var (
+		nBytesToCopy uint64 = 0
+		nBytesCopied uint64 = 0
+		written      uint64
+		state        []byte
+	)
+
+	// Example of StartWithProgress() - Part I.
 	// ----------------------------------------------------------------------
-	// It does the same thing as Example 1.
-	// It shows how to stop the IO copy and save the state.
+	// It does the same thing as Example of Start().
+	// It shows:
+	// (1). how to stop the IO copy and save the state.
+	// (2). how to process the EventProgress event.
+	// ----------------------------------------------------------------------
+
+	// URL of the remote file.
+	// SHA-256: 9e2f2a4031b215922aa21a3695e30bbfa1f7707597834287415dbc862c6a3251
+	downloadURL := "https://golang.google.cn/dl/go1.20.1.darwin-amd64.pkg"
+
+	// Do HTTP request and get the HTTP response body and the content length.
+	resp, nBytesToCopy, err := getRespAndSize(downloadURL, 0)
+	if err != nil {
+		log.Printf("getRespAndSize() error: %v", err)
+		return
+	}
+
+	defer resp.Body.Close()
+
+	// Create a hash.Hash for SHA-256.
+	// hash.Hash is an io.Writer.
+	hash := sha256.New()
+
+	// create a context with timeout to emulate the users' cancalation of the IO copy.
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	// Start a goroutine to do IO copy.
+	// Read from response.Body and write to an hash.Hash to compute the hash.
+	ch := iocopy.StartWithProgress(
+		// Context
+		ctx,
+		// Writer(dst)
+		hash,
+		// Reader(src)
+		resp.Body,
+		// Buffer size
+		16*1024*1024,
+		// Interval to report the number of bytes copied
+		80*time.Millisecond,
+		// Number of bytes to copy
+		nBytesToCopy,
+		// Number of bytes copied
+		nBytesCopied)
+
+	log.Printf("Example of StartWithProgress() - Part I: IO copy gouroutine started.")
+
+	// Read the events from the channel.
+	for event := range ch {
+		switch ev := event.(type) {
+		case *iocopy.EventWritten:
+			// n bytes have been written successfully.
+			written = ev.Written()
+			log.Printf("on EventWritten: %d bytes written", written)
+
+		case *iocopy.EventProgress:
+			// Get EventWritten from EventProgress
+			written = ev.Written()
+			log.Printf("on EventProgress: current: %d/%d(%.2f%%) written, total: %d/%d written(%.2f%%)",
+				written,
+				nBytesToCopy,
+				ev.CurrentPercent(),
+				nBytesCopied+written,
+				nBytesToCopy+nBytesCopied,
+				ev.TotalPercent())
+
+		case *iocopy.EventStop:
+			// Context is canceled or
+			// context's deadline exceeded.
+			// Save the number of bytes copied.
+			written = ev.Written()
+			nBytesCopied += written
+
+			log.Printf("on EventStop: %v, %d bytes written", ev.Err(), written)
+
+			// Save the state of hash.
+			marshaler, _ := hash.(encoding.BinaryMarshaler)
+			state, _ = marshaler.MarshalBinary()
+
+			log.Printf("Example of StartWithProgress() - Part I: IO copy is stopped. written: %d, nBytesCopied: %d, saved hash state: %X", written, nBytesCopied, state)
+
+		case *iocopy.EventError:
+			// an error occured.
+			log.Printf("on EventError: %v", ev.Err())
+
+		case *iocopy.EventOK:
+			// IO copy succeeded.
+			written = ev.Written()
+			log.Printf("on EventOK: %d bytes written", written)
+
+			// Get the final SHA-256 checksum of the remote file.
+			checksum := hash.Sum(nil)
+			fmt.Printf("SHA-256:\n%x\n", checksum)
+		}
+	}
+
+	// The event channel will be closed after:
+	// (1). iocopy.EventError received.
+	// (2). iocopy.EventStop received.
+	// (3). iocopy.EventOK received.
+	// The for-range loop exits when the channel is closed.
+	log.Printf("Example of StartWithProgress() - Part I: IO copy gouroutine exited and the event channel is closed")
+
+	// Example of StartWithProgress() - Part II.
+	// ----------------------------------------------------------------------
+	// It shows how to resume the IO copy with the saved state.
 	// ----------------------------------------------------------------------
 
 	// Do HTTP request and get the HTTP response body and the content length.
-	resp2, total, err := getRespAndSize(downloadURL, 0)
+	resp2, nBytesToCopy, err := getRespAndSize(downloadURL, written)
 	if err != nil {
 		log.Printf("getRespAndSize() error: %v", err)
+		log.Printf("it seems IO copy is done before timeout")
 		return
 	}
 
@@ -173,13 +267,16 @@ func ExampleStart() {
 	// hash.Hash is an io.Writer.
 	hash2 := sha256.New()
 
-	// create a context with timeout to emulate the users' cancalation of the IO copy.
-	ctx2, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
+	// Load the saved state.
+	unmarshaler, _ := hash2.(encoding.BinaryUnmarshaler)
+	unmarshaler.UnmarshalBinary(state)
+
+	// Create a context.
+	ctx2 := context.Background()
 
 	// Start a goroutine to do IO copy.
 	// Read from response.Body and write to an hash.Hash to compute the hash.
-	ch2 := iocopy.Start(
+	ch2 := iocopy.StartWithProgress(
 		// Context
 		ctx2,
 		// Writer(dst)
@@ -189,9 +286,13 @@ func ExampleStart() {
 		// Buffer size
 		16*1024*1024,
 		// Interval to report the number of bytes copied
-		80*time.Millisecond)
+		80*time.Millisecond,
+		// Number of bytes to copy
+		nBytesToCopy,
+		// Number of bytes copied
+		nBytesCopied)
 
-	log.Printf("Example 2 - Part I: IO copy gouroutine started.")
+	log.Printf("Example of StartWithProgress() - Part II: IO copy gouroutine started.")
 
 	// Read the events from the channel.
 	for event := range ch2 {
@@ -199,27 +300,17 @@ func ExampleStart() {
 		case *iocopy.EventWritten:
 			// n bytes have been written successfully.
 			written = ev.Written()
-			percent = computePercent(total, written, false)
-			log.Printf("on EventWritten: %v/%v bytes written(%.2f%%)", written, total, percent)
+			log.Printf("on EventWritten: %d bytes written", written)
 
-		case *iocopy.EventStop:
-			// Context is canceled or
-			// context's deadline exceeded.
-			// Get EventWritten from EventStop.
-			ew := ev.EventWritten()
-
-			// Save the number of bytes copied.
-			written = ew.Written()
-			oldWritten = written
-			percent = computePercent(total, written, false)
-
-			log.Printf("on EventStop: %v, %v/%v bytes written(%.2f%%)", ev.Err(), written, total, percent)
-
-			// Save the state of hash.
-			marshaler, _ := hash2.(encoding.BinaryMarshaler)
-			state, _ = marshaler.MarshalBinary()
-
-			log.Printf("IO copy is stopped. written: %d, saved hash state: %X", written, state)
+		case *iocopy.EventProgress:
+			written = ev.Written()
+			log.Printf("on EventProgress: current: %d/%d(%.2f%%) written, total: %d/%d written(%.2f%%)",
+				written,
+				nBytesToCopy,
+				ev.CurrentPercent(),
+				nBytesCopied+written,
+				nBytesToCopy+nBytesCopied,
+				ev.TotalPercent())
 
 		case *iocopy.EventError:
 			// an error occured.
@@ -227,15 +318,11 @@ func ExampleStart() {
 
 		case *iocopy.EventOK:
 			// IO copy succeeded.
-			// Get EventWritten from EventOK.
-			ew := ev.EventWritten()
-
-			written = ew.Written()
-			percent = computePercent(total, written, true)
-			log.Printf("on EventOK: %v/%v bytes written(%.2f%%)", written, total, percent)
+			written = ev.Written()
+			log.Printf("on EventOK: %d bytes written", written)
 
 			// Get the final SHA-256 checksum of the remote file.
-			checksum := hash.Sum(nil)
+			checksum := hash2.Sum(nil)
 			fmt.Printf("SHA-256:\n%x\n", checksum)
 		}
 	}
@@ -245,92 +332,9 @@ func ExampleStart() {
 	// (2). iocopy.EventStop received.
 	// (3). iocopy.EventOK received.
 	// The for-range loop exits when the channel is closed.
-	log.Printf("Example 2 - Part I: IO copy gouroutine exited and the event channel is closed")
-
-	// Example 2 - Part II.
-	// ----------------------------------------------------------------------
-	// It shows how to resume the IO copy with the saved state.
-	// ----------------------------------------------------------------------
-
-	// Do HTTP request and get the HTTP response body and the content length.
-	resp3, total, err := getRespAndSize(downloadURL, written)
-	if err != nil {
-		log.Printf("getRespAndSize() error: %v", err)
-		log.Printf("it seems IO copy is done before timeout")
-		return
-	}
-
-	defer resp3.Body.Close()
-
-	// Update total.
-	// "total" is the total size of left content(partial) to copy.
-	total += oldWritten
-
-	// Create a hash.Hash for SHA-256.
-	// hash.Hash is an io.Writer.
-	hash3 := sha256.New()
-
-	// Load the saved state.
-	unmarshaler, _ := hash3.(encoding.BinaryUnmarshaler)
-	unmarshaler.UnmarshalBinary(state)
-
-	// Create a context.
-	ctx3 := context.Background()
-
-	// Start a goroutine to do IO copy.
-	// Read from response.Body and write to an hash.Hash to compute the hash.
-	ch3 := iocopy.Start(
-		// Context
-		ctx3,
-		// Writer(dst)
-		hash3,
-		// Reader(src)
-		resp3.Body,
-		// Buffer size
-		16*1024*1024,
-		// Interval to report the number of bytes copied
-		80*time.Millisecond)
-
-	log.Printf("Example 2 - Part II: IO copy gouroutine started.")
-
-	// Read the events from the channel.
-	for event := range ch3 {
-		switch ev := event.(type) {
-		case *iocopy.EventWritten:
-			// n bytes have been written successfully.
-			written = oldWritten + ev.Written()
-			percent = computePercent(total, written, false)
-			log.Printf("on EventWritten: %v/%v bytes written(%.2f%%)", written, total, percent)
-
-		case *iocopy.EventError:
-			// an error occured.
-			log.Printf("on EventError: %v", ev.Err())
-
-		case *iocopy.EventOK:
-			// IO copy succeeded.
-			// Get EventWritten from EventOK.
-			ew := ev.EventWritten()
-
-			written = oldWritten + ew.Written()
-			percent = computePercent(total, written, true)
-			log.Printf("on EventOK: %v/%v bytes written(%.2f%%)", written, total, percent)
-
-			// Get the final SHA-256 checksum of the remote file.
-			checksum := hash.Sum(nil)
-			fmt.Printf("SHA-256:\n%x", checksum)
-		}
-	}
-
-	// The event channel will be closed after:
-	// (1). iocopy.EventError received.
-	// (2). iocopy.EventStop received.
-	// (3). iocopy.EventOK received.
-	// The for-range loop exits when the channel is closed.
-	log.Printf("Example 2 - Part II: IO copy gouroutine exited and the event channel is closed")
+	log.Printf("Example of StartWithProgress() - Part II: IO copy gouroutine exited and the event channel is closed")
 
 	// Output:
-	// SHA-256:
-	// 9e2f2a4031b215922aa21a3695e30bbfa1f7707597834287415dbc862c6a3251
 	// SHA-256:
 	// 9e2f2a4031b215922aa21a3695e30bbfa1f7707597834287415dbc862c6a3251
 }
