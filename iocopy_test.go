@@ -372,6 +372,9 @@ func ExampleCopyFile() {
 
 	log.Printf("CopyFile() succeed, %d bytes copied.", copied)
 
+	// Remove the file after test's done.
+	os.Remove(dst)
+
 	// Output:
 }
 
@@ -400,6 +403,9 @@ func ExampleCopyFileFS() {
 	}
 
 	log.Printf("CopyFileFS() succeed, %d bytes copied.", copied)
+
+	// Remove the file after test's done.
+	os.Remove(dst)
 
 	// Output:
 }
