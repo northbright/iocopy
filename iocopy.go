@@ -410,77 +410,13 @@ func StartWithProgress(
 // OnProgress presents the callback function on the copy progress is updated.
 type OnProgress func(written, total uint64, percent float32)
 
-// getReadCloserAndFileInfo opens the src and return the opened file and FileInfo.
-// src can be in a fs.FS or not. Set isSrcInFs to true and the fsys when src is in a fs.FS.
-func getReadCloserAndFileInfo(isSrcInFS bool, fsys fs.FS, src string) (io.ReadCloser, fs.FileInfo, error) {
-	if !isSrcInFS {
-		f, err := os.Open(src)
-		if err != nil {
-			return nil, nil, err
-		}
+// processEvent reads events from the channel and processes the events.
+func processEvent(total uint64, onProgress OnProgress, ch <-chan Event) (uint64, error) {
+	var (
+		err     error
+		written uint64
+	)
 
-		fi, err := f.Stat()
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// f is os.File which is a struct.
-		// Use type convertion.
-		return io.ReadCloser(f), fi, nil
-	} else {
-		f, err := fsys.Open(src)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		fi, err := f.Stat()
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// f is fs.File which is an interface.
-		// Use type assertion.
-		return f.(io.ReadCloser), fi, nil
-	}
-}
-
-// copyFile copies src to dst and reports the updated progress.
-// src can be in a fs.FS or not. Set isSrcInFs to true and the fsys when src is in a fs.FS.
-// onProgress will be called when progress is updated.
-// copyFile blocks the caller's goroutine until the copy is done or stopped.
-func copyFile(
-	ctx context.Context,
-	dst, src string,
-	isSrcInFS bool,
-	fsys fs.FS,
-	bufSize uint,
-	onProgress OnProgress) (uint64, error) {
-
-	ch := make(chan Event)
-
-	dstFile, err := os.Create(dst)
-	if err != nil {
-		return 0, err
-	}
-	defer dstFile.Close()
-
-	rc, fi, err := getReadCloserAndFileInfo(isSrcInFS, fsys, src)
-	if err != nil {
-		return 0, err
-	}
-	defer rc.Close()
-
-	// Check if src's a regular file.
-	if !fi.Mode().IsRegular() {
-		return 0, fmt.Errorf("not regular file")
-	}
-
-	// Get total size of src.
-	total := uint64(fi.Size())
-
-	go cp(ctx, dstFile, rc, bufSize, DefaultInterval, true, total, 0, ch)
-
-	written := uint64(0)
 	for event := range ch {
 		switch ev := event.(type) {
 		case *EventWritten:
@@ -507,11 +443,10 @@ func copyFile(
 			written = ev.Written()
 		}
 	}
-
 	return written, err
 }
 
-// copyFile copies src to dst and returns the number of bytes copied.
+// CopyFile copies src to dst and returns the number of bytes copied.
 // onProgress will be called when progress is updated.
 // It blocks the caller's goroutine until the copy is done or stopped.
 func CopyFile(
@@ -520,7 +455,39 @@ func CopyFile(
 	bufSize uint,
 	onProgress OnProgress) (uint64, error) {
 
-	return copyFile(ctx, dst, src, false, nil, bufSize, onProgress)
+	ch := make(chan Event)
+
+	// Open dst file.
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return 0, err
+	}
+	defer dstFile.Close()
+
+	// Open src file.
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return 0, err
+	}
+	defer srcFile.Close()
+
+	// Get the size of src file.
+	fi, err := srcFile.Stat()
+	if err != nil {
+		return 0, err
+	}
+
+	// Check if src's a regular file.
+	if !fi.Mode().IsRegular() {
+		return 0, fmt.Errorf("not regular file")
+	}
+
+	// Get total size of src.
+	total := uint64(fi.Size())
+
+	go cp(ctx, dstFile, srcFile, bufSize, DefaultInterval, true, total, 0, ch)
+
+	return processEvent(total, onProgress, ch)
 }
 
 // copyFileFS copies src in a fs.FS to dst and returns the number of bytes copied.
@@ -534,5 +501,37 @@ func CopyFileFS(
 	bufSize uint,
 	onProgress OnProgress) (uint64, error) {
 
-	return copyFile(ctx, dst, src, true, srcFS, bufSize, onProgress)
+	ch := make(chan Event)
+
+	// Open dst file.
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return 0, err
+	}
+	defer dstFile.Close()
+
+	// Open src file.
+	srcFile, err := srcFS.Open(src)
+	if err != nil {
+		return 0, err
+	}
+	defer srcFile.Close()
+
+	// Get the size of src file.
+	fi, err := srcFile.Stat()
+	if err != nil {
+		return 0, err
+	}
+
+	// Check if src's a regular file.
+	if !fi.Mode().IsRegular() {
+		return 0, fmt.Errorf("not regular file")
+	}
+
+	// Get total size of src.
+	total := uint64(fi.Size())
+
+	go cp(ctx, dstFile, srcFile, bufSize, DefaultInterval, true, total, 0, ch)
+
+	return processEvent(total, onProgress, ch)
 }
