@@ -262,7 +262,7 @@ func cp(
 				oldWritten = written
 				ch <- newEventWritten(written)
 
-				// Update progress.
+				// Update the progress.
 				updateProgress(
 					withProgress,
 					nBytesToCopy,
@@ -278,13 +278,12 @@ func cp(
 			// Context is canceled or
 			// context's deadline exceeded.
 
-			// Stop ticker.
+			// Stop the ticker.
 			if ticker != nil {
 				ticker.Stop()
 			}
-			ch <- newEventStop(ctx.Err(), written)
 
-			// Update progress.
+			// Update the progress.
 			updateProgress(
 				withProgress,
 				nBytesToCopy,
@@ -295,6 +294,7 @@ func cp(
 				&oldTotalPercent,
 				ch)
 
+			ch <- newEventStop(ctx.Err(), written)
 			return
 
 		default:
@@ -311,10 +311,7 @@ func cp(
 					ticker.Stop()
 				}
 
-				// Send an EventOK.
-				ch <- newEventOK(written)
-
-				// Update progress.
+				// Update the progress.
 				updateProgress(
 					withProgress,
 					nBytesToCopy,
@@ -325,6 +322,8 @@ func cp(
 					&oldTotalPercent,
 					ch)
 
+				// Send an EventOK.
+				ch <- newEventOK(written)
 				return
 			} else {
 				if n, err = dst.Write(buf[:n]); err != nil {
