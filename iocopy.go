@@ -480,34 +480,35 @@ func copyFile(
 
 	go cp(ctx, dstFile, rc, bufSize, DefaultInterval, true, total, 0, ch)
 
+	written := uint64(0)
 	for event := range ch {
 		switch ev := event.(type) {
 		case *EventWritten:
 			// n bytes have been written successfully.
 
 		case *EventProgress:
-			written := ev.Written()
+			written = ev.Written()
 			if onProgress != nil {
 				onProgress(written, total, ev.TotalPercent())
 			}
 		case *EventStop:
 			// Context is canceled or
 			// context's deadline exceeded.
-			written := ev.Written()
-			return written, ev.Err()
+			written = ev.Written()
+			// Save the error.
+			err = ev.Err()
 
 		case *EventError:
 			// an error occured.
-			return 0, err
+			err = ev.Err()
 
 		case *EventOK:
 			// IO copy succeeded.
-			written := ev.Written()
-			return written, nil
+			written = ev.Written()
 		}
 	}
 
-	return 0, fmt.Errorf("unknown error")
+	return written, err
 }
 
 // copyFile copies src to dst and returns the number of bytes copied.
