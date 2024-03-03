@@ -3,6 +3,7 @@ package iocopy_test
 import (
 	"context"
 	"crypto/sha256"
+	"embed"
 	"encoding"
 	"fmt"
 	"log"
@@ -13,6 +14,11 @@ import (
 	"time"
 
 	"github.com/northbright/iocopy"
+)
+
+var (
+	//go:embed README.md
+	embededFiles embed.FS
 )
 
 // getRespAndSize returns the HTTP response and size of the remote file.
@@ -349,6 +355,7 @@ func ExampleCopyFile() {
 
 	log.Printf("dst: %v", dst)
 
+	// Copy src to dst.
 	copied, err := iocopy.CopyFile(
 		ctx,
 		dst,
@@ -364,6 +371,35 @@ func ExampleCopyFile() {
 	}
 
 	log.Printf("CopyFile() succeed, %d bytes copied.", copied)
+
+	// Output:
+}
+
+func ExampleCopyFileFS() {
+	ctx := context.Background()
+	dst := filepath.Join(os.TempDir(), "README.md")
+	src := "README.md"
+	bufSize := iocopy.DefaultBufSize
+
+	log.Printf("dst: %v", dst)
+
+	// Copy src in embed.FS to dst.
+	copied, err := iocopy.CopyFileFS(
+		ctx,
+		dst,
+		embededFiles,
+		src,
+		bufSize,
+		func(written, total uint64, percent float32) {
+			log.Printf("on progress: %d/%d(%.2f%%) bytes written", written, total, percent)
+		})
+
+	if err != nil {
+		log.Printf("CopyFileFS() error: %v", err)
+		return
+	}
+
+	log.Printf("CopyFileFS() succeed, %d bytes copied.", copied)
 
 	// Output:
 }

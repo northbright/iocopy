@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"runtime"
 	"time"
@@ -407,11 +408,52 @@ func StartWithProgress(
 	return ch
 }
 
+// OnProgress presents the callback function on the copy progress is updated.
 type OnProgress func(written, total uint64, percent float32)
 
-func CopyFile(
+// getReadCloserAndFileInfo opens the src and return the opened file and FileInfo.
+// src can be in a fs.FS or not. Set isSrcInFs to true and the fsys when src is in a fs.FS.
+func getReadCloserAndFileInfo(isSrcInFS bool, fsys fs.FS, src string) (io.ReadCloser, fs.FileInfo, error) {
+	if !isSrcInFS {
+		f, err := os.Open(src)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		fi, err := f.Stat()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// f is os.File which is a struct.
+		// Use type convertion.
+		return io.ReadCloser(f), fi, nil
+	} else {
+		f, err := fsys.Open(src)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		fi, err := f.Stat()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// f is fs.File which is an interface.
+		// Use type assertion.
+		return f.(io.ReadCloser), fi, nil
+	}
+}
+
+// copyFile copies src to dst and reports the updated progress.
+// src can be in a fs.FS or not. Set isSrcInFs to true and the fsys when src is in a fs.FS.
+// onProgress will be called when progress is updated.
+// copyFile blocks the caller's goroutine until the copy is done or stopped.
+func copyFile(
 	ctx context.Context,
 	dst, src string,
+	isSrcInFS bool,
+	fsys fs.FS,
 	bufSize uint,
 	onProgress OnProgress) (uint64, error) {
 
@@ -423,25 +465,21 @@ func CopyFile(
 	}
 	defer dstFile.Close()
 
-	srcFile, err := os.Open(src)
+	rc, fi, err := getReadCloserAndFileInfo(isSrcInFS, fsys, src)
 	if err != nil {
 		return 0, err
 	}
-	defer srcFile.Close()
+	defer rc.Close()
 
-	fi, err := srcFile.Stat()
-	if err != nil {
-		return 0, err
-	}
-
-	// Check if it's a regular file.
+	// Check if src's a regular file.
 	if !fi.Mode().IsRegular() {
 		return 0, fmt.Errorf("not regular file")
 	}
 
+	// Get total size of src.
 	total := uint64(fi.Size())
 
-	go cp(ctx, dstFile, srcFile, bufSize, DefaultInterval, true, total, 0, ch)
+	go cp(ctx, dstFile, rc, bufSize, DefaultInterval, true, total, 0, ch)
 
 	for event := range ch {
 		switch ev := event.(type) {
@@ -467,9 +505,34 @@ func CopyFile(
 			// IO copy succeeded.
 			written := ev.Written()
 			return written, nil
-
 		}
 	}
 
 	return 0, fmt.Errorf("unknown error")
+}
+
+// copyFile copies src to dst and returns the number of bytes copied.
+// onProgress will be called when progress is updated.
+// It blocks the caller's goroutine until the copy is done or stopped.
+func CopyFile(
+	ctx context.Context,
+	dst, src string,
+	bufSize uint,
+	onProgress OnProgress) (uint64, error) {
+
+	return copyFile(ctx, dst, src, false, nil, bufSize, onProgress)
+}
+
+// copyFileFS copies src in a fs.FS to dst and returns the number of bytes copied.
+// onProgress will be called when progress is updated.
+// It blocks the caller's goroutine until the copy is done or stopped.
+func CopyFileFS(
+	ctx context.Context,
+	dst string,
+	srcFS fs.FS,
+	src string,
+	bufSize uint,
+	onProgress OnProgress) (uint64, error) {
+
+	return copyFile(ctx, dst, src, true, srcFS, bufSize, onProgress)
 }
