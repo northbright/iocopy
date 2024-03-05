@@ -408,10 +408,11 @@ func StartWithProgress(
 }
 
 // OnProgress presents the callback function on the copy progress is updated.
-type OnProgress func(written, total uint64, percent float32)
+// total and percent are ignored when isTotalSizeUnknown is true.
+type OnProgress func(isTotalSizeUnknown bool, total, written uint64, percent float32)
 
 // processEvent reads events from the channel and processes the events.
-func processEvent(total uint64, onProgress OnProgress, ch <-chan Event) (uint64, error) {
+func processEvent(isTotalSizeUnknown bool, total uint64, onProgress OnProgress, ch <-chan Event) (uint64, error) {
 	var (
 		err     error
 		written uint64
@@ -425,7 +426,12 @@ func processEvent(total uint64, onProgress OnProgress, ch <-chan Event) (uint64,
 		case *EventProgress:
 			written = ev.Written()
 			if onProgress != nil {
-				onProgress(written, total, ev.TotalPercent())
+				if isTotalSizeUnknown {
+					// total size is unknown.
+					onProgress(isTotalSizeUnknown, 0, written, 0)
+				} else {
+					onProgress(isTotalSizeUnknown, total, written, ev.TotalPercent())
+				}
 			}
 		case *EventStop:
 			// Context is canceled or
@@ -487,7 +493,7 @@ func CopyFile(
 
 	go cp(ctx, dstFile, srcFile, bufSize, DefaultInterval, true, total, 0, ch)
 
-	return processEvent(total, onProgress, ch)
+	return processEvent(false, total, onProgress, ch)
 }
 
 // copyFileFS copies src in a fs.FS to dst and returns the number of bytes copied.
@@ -533,5 +539,5 @@ func CopyFileFS(
 
 	go cp(ctx, dstFile, srcFile, bufSize, DefaultInterval, true, total, 0, ch)
 
-	return processEvent(total, onProgress, ch)
+	return processEvent(false, total, onProgress, ch)
 }

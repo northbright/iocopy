@@ -365,7 +365,7 @@ func ExampleCopyFile() {
 			dst,
 			src,
 			bufSize,
-			func(written, total uint64, percent float32) {
+			func(isTotalSizeUnknown bool, total, written uint64, percent float32) {
 				log.Printf("on progress: %d/%d(%.2f%%) bytes written", written, total, percent)
 			})
 
@@ -398,7 +398,7 @@ func ExampleCopyFileFS() {
 		embededFiles,
 		src,
 		bufSize,
-		func(written, total uint64, percent float32) {
+		func(isTotalSizeUnknown bool, total, written uint64, percent float32) {
 			log.Printf("on progress: %d/%d(%.2f%%) bytes written", written, total, percent)
 		})
 
