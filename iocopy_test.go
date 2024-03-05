@@ -322,32 +322,63 @@ func ExampleStartWithProgress() {
 }
 
 func ExampleCopyFile() {
-	ctx := context.Background()
-	dst := filepath.Join(os.TempDir(), "iocopy.go")
-	src := "iocopy.go"
-	bufSize := iocopy.DefaultBufSize
-
-	log.Printf("dst: %v", dst)
-
-	// Copy src to dst.
-	copied, err := iocopy.CopyFile(
-		ctx,
-		dst,
-		src,
-		bufSize,
-		func(written, total uint64, percent float32) {
-			log.Printf("on progress: %d/%d(%.2f%%) bytes written", written, total, percent)
-		})
-
-	if err != nil {
-		log.Printf("CopyFile() error: %v", err)
-		return
+	type CopyParam struct {
+		Dst string
+		Src string
+		// Used to create the source file on the fly if needed.
+		GenSrcFunc func(src string)
 	}
 
-	log.Printf("CopyFile() succeed, %d bytes copied.", copied)
+	cpParams := []CopyParam{
+		CopyParam{
+			Dst:        filepath.Join(os.TempDir(), "iocopy.go"),
+			Src:        "iocopy.go",
+			GenSrcFunc: nil,
+		},
+		CopyParam{
+			Dst: filepath.Join(os.TempDir(), "b.go"),
+			Src: filepath.Join(os.TempDir(), "a.go"),
+			GenSrcFunc: func(src string) {
+				// Create a 0-byte file
+				f, _ := os.Create(src)
+				f.Close()
+			},
+		},
+	}
 
-	// Remove the file after test's done.
-	os.Remove(dst)
+	ctx := context.Background()
+	bufSize := iocopy.DefaultBufSize
+
+	for _, param := range cpParams {
+		if param.GenSrcFunc != nil {
+			param.GenSrcFunc(param.Src)
+		}
+
+		dst := param.Dst
+		src := param.Src
+
+		log.Printf("CopyFile() started. dst: %s, src: %s", dst, src)
+
+		// Copy src to dst.
+		copied, err := iocopy.CopyFile(
+			ctx,
+			dst,
+			src,
+			bufSize,
+			func(written, total uint64, percent float32) {
+				log.Printf("on progress: %d/%d(%.2f%%) bytes written", written, total, percent)
+			})
+
+		if err != nil {
+			log.Printf("CopyFile() error: %v", err)
+			return
+		}
+
+		log.Printf("CopyFile() succeed, %d bytes copied.", copied)
+
+		// Remove the file after test's done.
+		os.Remove(dst)
+	}
 
 	// Output:
 }
@@ -358,7 +389,7 @@ func ExampleCopyFileFS() {
 	src := "README.md"
 	bufSize := iocopy.DefaultBufSize
 
-	log.Printf("dst: %v", dst)
+	log.Printf("CopyFileFS() started. dst: %s, src: %s", dst, src)
 
 	// Copy src in embed.FS to dst.
 	copied, err := iocopy.CopyFileFS(
