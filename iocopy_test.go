@@ -7,12 +7,11 @@ import (
 	"encoding"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
+	"github.com/northbright/httputil"
 	"github.com/northbright/iocopy"
 )
 
@@ -20,46 +19,6 @@ var (
 	//go:embed README.md
 	embededFiles embed.FS
 )
-
-// getRespAndSize returns the HTTP response and size of the remote file.
-func getRespAndSize(remoteURL string, written uint64) (*http.Response, uint64, error) {
-	// Create a HTTP client.
-	client := http.Client{}
-	req, err := http.NewRequest("GET", remoteURL, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	// Set range header to resume downloading if need.
-	if written > 0 {
-		bytesRange := fmt.Sprintf("bytes=%d-", written)
-		req.Header.Add("range", bytesRange)
-	}
-
-	// Do HTTP request.
-	// resp.Body(io.ReadCloser) will be closed
-	// when Hasher.Close is called.
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	// Check the status code.
-	if resp.StatusCode != 200 && resp.StatusCode != 206 {
-		log.Printf("status code is not 200 or 206: %v", resp.StatusCode)
-		return nil, 0, fmt.Errorf("status code is not 200 or 206")
-	}
-
-	// Get the remote file size.
-	contentLength := resp.Header.Get("Content-Length")
-	total, _ := strconv.ParseUint(contentLength, 10, 64)
-	if total <= 0 {
-		log.Printf("Content-Length <= 0: %v", total)
-		return nil, 0, err
-	}
-
-	return resp, total, nil
-}
 
 func ExampleStart() {
 	var (
@@ -77,13 +36,18 @@ func ExampleStart() {
 	downloadURL := "https://golang.google.cn/dl/go1.20.1.darwin-amd64.pkg"
 
 	// Do HTTP request and get the HTTP response body and the content length.
-	resp, _, err := getRespAndSize(downloadURL, 0)
+	resp, isSizeUnknown, size, isRangeSupported, err := httputil.GetResp(downloadURL)
 	if err != nil {
-		log.Printf("getRespAndSize() error: %v", err)
+		log.Printf("GetResp() error: %v", err)
 		return
 	}
-
 	defer resp.Body.Close()
+
+	log.Printf("GetResp() for %v OK", downloadURL)
+	log.Printf("is size unknown: %v, size: %d, is range supported: %v",
+		isSizeUnknown,
+		size,
+		isRangeSupported)
 
 	// Create a hash.Hash for SHA-256.
 	// hash.Hash is an io.Writer.
@@ -114,7 +78,7 @@ func ExampleStart() {
 		case *iocopy.EventWritten:
 			// n bytes have been written successfully.
 			written = ev.Written()
-			log.Printf("on EventWritten: %d bytes written", written)
+			log.Printf("on EventWritten: %d/%d bytes written", written, size)
 
 		case *iocopy.EventError:
 			// an error occured.
@@ -123,7 +87,7 @@ func ExampleStart() {
 		case *iocopy.EventOK:
 			// IO copy succeeded.
 			written = ev.Written()
-			log.Printf("on EventOK: %d bytes written", written)
+			log.Printf("on EventOK: %d/%d bytes written", written, size)
 
 			// Get the final SHA-256 checksum of the remote file.
 			checksum := hash.Sum(nil)
@@ -164,13 +128,18 @@ func ExampleStartWithProgress() {
 	downloadURL := "https://golang.google.cn/dl/go1.20.1.darwin-amd64.pkg"
 
 	// Do HTTP request and get the HTTP response body and the content length.
-	resp, nBytesToCopy, err := getRespAndSize(downloadURL, 0)
+	resp, isSizeUnknown, nBytesToCopy, isRangeSupported, err := httputil.GetResp(downloadURL)
 	if err != nil {
-		log.Printf("getRespAndSize() error: %v", err)
+		log.Printf("GetResp() error: %v", err)
 		return
 	}
-
 	defer resp.Body.Close()
+
+	log.Printf("GetResp() for %v OK", downloadURL)
+	log.Printf("is size unknown: %v, size: %d, is range supported: %v",
+		isSizeUnknown,
+		nBytesToCopy,
+		isRangeSupported)
 
 	// Create a hash.Hash for SHA-256.
 	// hash.Hash is an io.Writer.
@@ -216,7 +185,7 @@ func ExampleStartWithProgress() {
 				nBytesToCopy,
 				ev.CurrentPercent(),
 				nBytesCopied+written,
-				nBytesToCopy+nBytesCopied,
+				nBytesCopied+nBytesToCopy,
 				ev.TotalPercent())
 
 		case *iocopy.EventStop:
@@ -262,14 +231,19 @@ func ExampleStartWithProgress() {
 	// ----------------------------------------------------------------------
 
 	// Do HTTP request and get the HTTP response body and the content length.
-	resp2, nBytesToCopy, err := getRespAndSize(downloadURL, written)
+	resp2, nBytesToCopy, err := httputil.GetRespOfRangeStart(downloadURL, written)
 	if err != nil {
-		log.Printf("getRespAndSize() error: %v", err)
+		log.Printf("GetRespOfRangeStart() error: %v", err)
 		log.Printf("it seems IO copy is done before timeout")
 		return
 	}
-
 	defer resp2.Body.Close()
+
+	log.Printf("GetRespOfRangeStart(): 'bytes=%d-' for %v OK", written, downloadURL)
+	log.Printf("is size unknown: %v, size: %d, is range supported: %v",
+		isSizeUnknown,
+		nBytesToCopy,
+		isRangeSupported)
 
 	// Create a hash.Hash for SHA-256.
 	// hash.Hash is an io.Writer.

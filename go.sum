@@ -1,2 +1,2 @@
-github.com/northbright/pathelper v1.0.7 h1:s9iUCqwVe6zo5lz1nI3kcufyBOZ6IpSD2HtisKN+2hk=
-github.com/northbright/pathelper v1.0.7/go.mod h1:LBNv/o8YBdntBXTIWuzdhp+UzLqI4lJoCETHo1QM9Bw=
+github.com/northbright/httputil v1.2.0 h1:LZOcxFzyXwV+iuoxhviqGDvgSf4Pa5JtX3vveF9K2yA=
+github.com/northbright/httputil v1.2.0/go.mod h1:ANMNxMzrd1ffD1SDsxtD1COSM2Nyq2Y6iqis8bqdDoU=
