@@ -120,27 +120,22 @@ func (e *EventOK) Written() uint64 {
 
 // EventProgress is the event that IO copy progress updated.
 type EventProgress struct {
-	ew             *EventWritten
-	currentPercent float32
-	totalPercent   float32
+	ew      *EventWritten
+	percent float32
 }
 
 func newEventProgress(
 	written uint64,
-	currentPercent float32,
-	totalPercent float32) *EventProgress {
+	percent float32) *EventProgress {
 	return &EventProgress{
-		ew:             newEventWritten(written),
-		currentPercent: currentPercent,
-		totalPercent:   totalPercent}
+		ew:      newEventWritten(written),
+		percent: percent,
+	}
 }
 
 // String implements the stringer interface.
 func (e *EventProgress) String() string {
-	return fmt.Sprintf("progress updated, %d bytes written, current: %.2f%%, total: %.2f%%",
-		e.Written(),
-		e.currentPercent,
-		e.totalPercent)
+	return fmt.Sprintf("progress updated: %.2f%%", e.percent)
 }
 
 // Written returns the number of bytes written successfuly.
@@ -148,68 +143,43 @@ func (e *EventProgress) Written() uint64 {
 	return e.ew.Written()
 }
 
-// EventWritten returns the current percentage of the copy progress.
-// Current percentage may NOT be the same as total percentage. e.g. Resume an IO copy.
-func (e *EventProgress) CurrentPercent() float32 {
-	return e.currentPercent
-}
-
-// EventWritten returns the total percentage of the copy progress.
-func (e *EventProgress) TotalPercent() float32 {
-	return e.totalPercent
+// EventWritten returns the percentage of the copy progress.
+func (e *EventProgress) Percent() float32 {
+	return e.percent
 }
 
 // ComputePercent returns the current and total percentage.
 // It assumes that nBytesToCopy + nBytesCopied = total number of bytes of the source.
-// Current percentage: percentage for the current running IO copy goroutine.
-// Total percentage: percentage for the whole IO copy which may be separated into multiple sub IO copies due to users' stopping / resuming the IO copy.
-func ComputePercent(nBytesToCopy, nBytesCopied, written uint64, done bool) (currentPercent float32, totalPercent float32) {
+func ComputePercent(nBytesToCopy, nBytesCopied, written uint64, done bool) float32 {
 	total := nBytesToCopy + nBytesCopied
 
 	if done {
 		// Return 100 percent when copy is done,
 		// even if total is 0.
-		return 100, 100
+		return 100
 	}
 
 	if total == 0 {
-		return 0, 0
+		return 0
 	}
 
-	if nBytesToCopy == 0 {
-		currentPercent = 0
-	} else {
-		currentPercent = float32(float64(written) / (float64(nBytesToCopy) / float64(100)))
-	}
-
-	totalPercent = float32(float64(nBytesCopied+written) / (float64(total) / float64(100)))
-
-	return currentPercent, totalPercent
+	return float32(float64(nBytesCopied+written) / (float64(total) / float64(100)))
 }
 
 // updateProgress returns the new current and total percent, send an EventProgress event to the channel if the progress was updated.
-func updateProgress(withProgress bool, nBytesToCopy, nBytesCopied, written uint64, done bool, oldCurrentPercent, oldTotalPercent *float32, ch chan<- Event) {
+func updateProgress(withProgress bool, nBytesToCopy, nBytesCopied, written uint64, done bool, oldPercent *float32, ch chan<- Event) {
 	if !withProgress {
 		return
 	}
-	currentPercent, totalPercent := ComputePercent(
+	percent := ComputePercent(
 		nBytesToCopy,
 		nBytesCopied,
 		written,
 		done)
 
-	changed := false
-	if currentPercent != *oldCurrentPercent {
-		*oldCurrentPercent = currentPercent
-		changed = true
-	}
-	if totalPercent != *oldTotalPercent {
-		*oldTotalPercent = totalPercent
-		changed = true
-	}
-
-	if changed {
-		ch <- newEventProgress(written, currentPercent, totalPercent)
+	if percent != *oldPercent {
+		*oldPercent = percent
+		ch <- newEventProgress(written, percent)
 	}
 }
 
@@ -224,11 +194,10 @@ func cp(
 	nBytesCopied uint64,
 	ch chan Event) {
 	var (
-		written           uint64       = 0
-		oldWritten        uint64       = 0
-		oldCurrentPercent float32      = 0
-		oldTotalPercent   float32      = 0
-		ticker            *time.Ticker = nil
+		written    uint64       = 0
+		oldWritten uint64       = 0
+		oldPercent float32      = 0
+		ticker     *time.Ticker = nil
 	)
 
 	defer func() {
@@ -269,8 +238,7 @@ func cp(
 					nBytesCopied,
 					written,
 					false,
-					&oldCurrentPercent,
-					&oldTotalPercent,
+					&oldPercent,
 					ch)
 			}
 
@@ -290,8 +258,7 @@ func cp(
 				nBytesCopied,
 				written,
 				false,
-				&oldCurrentPercent,
-				&oldTotalPercent,
+				&oldPercent,
 				ch)
 
 			ch <- newEventStop(ctx.Err(), written)
@@ -318,8 +285,7 @@ func cp(
 					nBytesCopied,
 					written,
 					true,
-					&oldCurrentPercent,
-					&oldTotalPercent,
+					&oldPercent,
 					ch)
 
 				// Send an EventOK.
@@ -409,7 +375,7 @@ func StartWithProgress(
 
 // OnProgress presents the callback function on the copy progress is updated.
 // total and percent are ignored when isTotalSizeUnknown is true.
-type OnProgress func(isTotalSizeUnknown bool, total, written uint64, percent float32)
+type OnProgress func(isTotalSizeUnknown bool, total, copied uint64, percent float32)
 
 // processEvent reads events from the channel and processes the events.
 func processEvent(isTotalSizeUnknown bool, total uint64, onProgress OnProgress, ch <-chan Event) (uint64, error) {
@@ -430,7 +396,7 @@ func processEvent(isTotalSizeUnknown bool, total uint64, onProgress OnProgress, 
 					// total size is unknown.
 					onProgress(isTotalSizeUnknown, 0, written, 0)
 				} else {
-					onProgress(isTotalSizeUnknown, total, written, ev.TotalPercent())
+					onProgress(isTotalSizeUnknown, total, written, ev.Percent())
 				}
 			}
 		case *EventStop:

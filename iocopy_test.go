@@ -180,13 +180,10 @@ func ExampleStartWithProgress() {
 		case *iocopy.EventProgress:
 			// Get EventWritten from EventProgress
 			written = ev.Written()
-			log.Printf("on EventProgress: current: %d/%d(%.2f%%) written, total: %d/%d written(%.2f%%)",
-				written,
-				nBytesToCopy,
-				ev.CurrentPercent(),
+			log.Printf("on EventProgress:  %d/%d(%.2f%%) copied",
 				nBytesCopied+written,
 				nBytesCopied+nBytesToCopy,
-				ev.TotalPercent())
+				ev.Percent())
 
 		case *iocopy.EventStop:
 			// Context is canceled or
@@ -286,13 +283,10 @@ func ExampleStartWithProgress() {
 
 		case *iocopy.EventProgress:
 			written = ev.Written()
-			log.Printf("on EventProgress: current: %d/%d(%.2f%%) written, total: %d/%d written(%.2f%%)",
-				written,
-				nBytesToCopy,
-				ev.CurrentPercent(),
+			log.Printf("on EventProgress:  %d/%d(%.2f%%) copied",
 				nBytesCopied+written,
-				nBytesToCopy+nBytesCopied,
-				ev.TotalPercent())
+				nBytesCopied+nBytesToCopy,
+				ev.Percent())
 
 		case *iocopy.EventError:
 			// an error occured.
