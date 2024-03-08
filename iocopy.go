@@ -144,6 +144,7 @@ func (e *EventProgress) Written() uint64 {
 }
 
 // EventWritten returns the percentage of the copy progress.
+// percent = number of bytes copied + bytes written currently / number of bytes copied + number of bytes to copy.
 func (e *EventProgress) Percent() float32 {
 	return e.percent
 }
