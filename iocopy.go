@@ -149,10 +149,10 @@ func (e *EventProgress) Percent() float32 {
 	return e.percent
 }
 
-// ComputePercent returns the current and total percentage.
-// It assumes that nBytesToCopy + nBytesCopied = total number of bytes of the source.
-func ComputePercent(nBytesToCopy, nBytesCopied, written uint64, done bool) float32 {
-	total := nBytesToCopy + nBytesCopied
+// ComputePercent returns the percentage.
+// It assumes that toCopy + copied = total number of bytes of the source.
+func ComputePercent(toCopy, copied, written uint64, done bool) float32 {
+	total := toCopy + copied
 
 	if done {
 		// Return 100 percent when copy is done,
@@ -164,17 +164,17 @@ func ComputePercent(nBytesToCopy, nBytesCopied, written uint64, done bool) float
 		return 0
 	}
 
-	return float32(float64(nBytesCopied+written) / (float64(total) / float64(100)))
+	return float32(float64(copied+written) / (float64(total) / float64(100)))
 }
 
-// updateProgress returns the new current and total percent, send an EventProgress event to the channel if the progress was updated.
-func updateProgress(withProgress bool, nBytesToCopy, nBytesCopied, written uint64, done bool, oldPercent *float32, ch chan<- Event) {
-	if !withProgress {
+// updateProgress returns the new percent, send an EventProgress event to the channel if the progress was updated.
+func updateProgress(isToCopyKnown bool, toCopy, copied, written uint64, done bool, oldPercent *float32, ch chan<- Event) {
+	if !isToCopyKnown {
 		return
 	}
 	percent := ComputePercent(
-		nBytesToCopy,
-		nBytesCopied,
+		toCopy,
+		copied,
 		written,
 		done)
 
@@ -190,9 +190,9 @@ func cp(
 	src io.Reader,
 	bufSize uint,
 	interval time.Duration,
-	withProgress bool,
-	nBytesToCopy uint64,
-	nBytesCopied uint64,
+	isToCopyKnown bool,
+	toCopy uint64,
+	copied uint64,
 	ch chan Event) {
 	var (
 		written    uint64       = 0
@@ -234,9 +234,9 @@ func cp(
 
 				// Update the progress.
 				updateProgress(
-					withProgress,
-					nBytesToCopy,
-					nBytesCopied,
+					isToCopyKnown,
+					toCopy,
+					copied,
 					written,
 					false,
 					&oldPercent,
@@ -254,9 +254,9 @@ func cp(
 
 			// Update the progress.
 			updateProgress(
-				withProgress,
-				nBytesToCopy,
-				nBytesCopied,
+				isToCopyKnown,
+				toCopy,
+				copied,
 				written,
 				false,
 				&oldPercent,
@@ -281,9 +281,9 @@ func cp(
 
 				// Update the progress.
 				updateProgress(
-					withProgress,
-					nBytesToCopy,
-					nBytesCopied,
+					isToCopyKnown,
+					toCopy,
+					copied,
 					written,
 					true,
 					&oldPercent,
@@ -350,14 +350,15 @@ func Start(
 
 // StartWithProgress returns a channel for the caller to receive IO copy events and start a goroutine to do IO copy.
 // It's an wrapper of Start and most of the parameters are the same.
+// It requires the number of bytes to copy and the number of bytes copied previously.
+// To start a new IO copy with progress:
+// Set total to the number of bytes to copy and set copied to 0.
+//
 // To resume an IO copy:
 // (1). Users should save the state and the number of bytes copied after the IO copy stopped(e.g. timeout or user canceled).
 // (2). Call StartWithProgress again, make dst and src load the saved state or set the offset according to number of the bytes to copied.
 //
 // A new event: EventProgress will be sent to the channel when progress was updated.
-// Call CurrentPercent and TotalPercent on the event to get the percentages.
-// Current percentage: percentage of the current running IO copy.
-// Total percentage: percentage of the whole IO copy which may be separated into multiple sub IO copies due to users' stopping / resuming the IO copy.
 // See Start for more information.
 func StartWithProgress(
 	ctx context.Context,
@@ -365,11 +366,11 @@ func StartWithProgress(
 	src io.Reader,
 	bufSize uint,
 	interval time.Duration,
-	nBytesToCopy uint64,
-	nBytesCopied uint64) <-chan Event {
+	toCopy uint64,
+	copied uint64) <-chan Event {
 	ch := make(chan Event)
 
-	go cp(ctx, dst, src, bufSize, interval, true, nBytesToCopy, nBytesCopied, ch)
+	go cp(ctx, dst, src, bufSize, interval, true, toCopy, copied, ch)
 
 	return ch
 }
