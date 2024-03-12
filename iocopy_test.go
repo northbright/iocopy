@@ -7,8 +7,6 @@ import (
 	"encoding"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/northbright/httputil"
@@ -20,6 +18,7 @@ var (
 	embededFiles embed.FS
 )
 
+/*
 func ExampleStart() {
 	var (
 		written uint64
@@ -36,7 +35,7 @@ func ExampleStart() {
 	downloadURL := "https://golang.google.cn/dl/go1.20.1.darwin-amd64.pkg"
 
 	// Do HTTP request and get the HTTP response body and the content length.
-	resp, isSizeUnknown, size, isRangeSupported, err := httputil.GetResp(downloadURL)
+	resp, isTotalKnown, size, isRangeSupported, err := httputil.GetResp(downloadURL)
 	if err != nil {
 		log.Printf("GetResp() error: %v", err)
 		return
@@ -44,8 +43,8 @@ func ExampleStart() {
 	defer resp.Body.Close()
 
 	log.Printf("GetResp() for %v OK", downloadURL)
-	log.Printf("is size unknown: %v, size: %d, is range supported: %v",
-		isSizeUnknown,
+	log.Printf("is total size known: %v, size: %d, is range supported: %v",
+		isTotalKnown,
 		size,
 		isRangeSupported)
 
@@ -106,16 +105,16 @@ func ExampleStart() {
 	// SHA-256:
 	// 9e2f2a4031b215922aa21a3695e30bbfa1f7707597834287415dbc862c6a3251
 }
+*/
 
-func ExampleStartWithProgress() {
+func ExampleStart() {
 	var (
-		toCopy  uint64 = 0
-		copied  uint64 = 0
-		written uint64
-		state   []byte
+		total  uint64 = 0
+		copied uint64 = 0
+		state  []byte
 	)
 
-	// Example of StartWithProgress() - Part I.
+	// Example of Start() - Part I.
 	// ----------------------------------------------------------------------
 	// It does the same thing as Example of Start().
 	// It shows:
@@ -128,7 +127,7 @@ func ExampleStartWithProgress() {
 	downloadURL := "https://golang.google.cn/dl/go1.20.1.darwin-amd64.pkg"
 
 	// Do HTTP request and get the HTTP response body and the content length.
-	resp, isSizeUnknown, toCopy, isRangeSupported, err := httputil.GetResp(downloadURL)
+	resp, isTotalKnown, total, isRangeSupported, err := httputil.GetResp(downloadURL)
 	if err != nil {
 		log.Printf("GetResp() error: %v", err)
 		return
@@ -136,9 +135,9 @@ func ExampleStartWithProgress() {
 	defer resp.Body.Close()
 
 	log.Printf("GetResp() for %v OK", downloadURL)
-	log.Printf("is size unknown: %v, size: %d, is range supported: %v",
-		isSizeUnknown,
-		toCopy,
+	log.Printf("is total size known: %v, size: %d, is range supported: %v",
+		isTotalKnown,
+		total,
 		isRangeSupported)
 
 	// Create a hash.Hash for SHA-256.
@@ -151,67 +150,64 @@ func ExampleStartWithProgress() {
 
 	// Start a goroutine to do IO copy.
 	// Read from response.Body and write to an hash.Hash to compute the hash.
-	ch := iocopy.StartWithProgress(
-		// Context
+	ch := iocopy.Start(
+		// context
 		ctx,
-		// Writer(dst)
+		// writer(dst)
 		hash,
-		// Reader(src)
+		// reader(src)
 		resp.Body,
-		// Buffer size
+		// buffer size
 		16*1024*1024,
-		// Interval to report the number of bytes copied
+		// interval to report the number of bytes copied
 		80*time.Millisecond,
-		// Number of bytes to copy
-		toCopy,
-		// Number of bytes copied
+		// is total bytes to copy known
+		isTotalKnown,
+		// number of bytes to copy
+		total,
+		// number of bytes copied
 		copied)
 
-	log.Printf("Example of StartWithProgress() - Part I: IO copy gouroutine started.")
+	log.Printf("Example of Start() - Part I: IO copy gouroutine started.")
 
 	// Read the events from the channel.
 	for event := range ch {
 		switch ev := event.(type) {
 		case *iocopy.EventWritten:
 			// n bytes have been written successfully.
-			written = ev.Written()
-			log.Printf("on EventWritten: %d bytes written", written)
-
-		case *iocopy.EventProgress:
-			// Get EventWritten from EventProgress
-			written = ev.Written()
-			log.Printf("on EventProgress:  %d/%d(%.2f%%) copied",
-				copied+written,
-				copied+toCopy,
-				ev.Percent())
+			log.Printf("on EventWritten: %d bytes written, %d/%d(%.2f%%) bytes copied",
+				ev.Written(),
+				ev.Copied(),
+				ev.Total(),
+				ev.Percent(),
+			)
 
 		case *iocopy.EventStop:
 			// Context is canceled or
 			// context's deadline exceeded.
-			// Save the number of bytes copied.
-			written = ev.Written()
-			copied += written
-
-			log.Printf("on EventStop: %v, %d bytes written", ev.Err(), written)
+			// Set the number of bytes copied to the number of bytes written.
+			ew := ev.EventWritten()
+			copied = ew.Copied()
 
 			// Save the state of hash.
 			marshaler, _ := hash.(encoding.BinaryMarshaler)
 			state, _ = marshaler.MarshalBinary()
 
-			log.Printf("Example of StartWithProgress() - Part I: IO copy is stopped. written: %d, copied: %d, saved hash state: %X", written, copied, state)
+			log.Printf("on EvnetStop(%v): %d bytes written, %d/%d(%.2f%%) copied. Saved hash state: %X",
+				ev.Err(),
+				ew.Written(),
+				ew.Copied(),
+				ew.Total(),
+				ew.Percent(),
+				state,
+			)
 
 		case *iocopy.EventError:
 			// an error occured.
 			log.Printf("on EventError: %v", ev.Err())
 
 		case *iocopy.EventOK:
-			// IO copy succeeded.
-			written = ev.Written()
-			log.Printf("on EventOK: %d bytes written", written)
-
-			// Get the final SHA-256 checksum of the remote file.
-			checksum := hash.Sum(nil)
-			fmt.Printf("SHA-256:\n%x\n", checksum)
+			// Should not receive EventOK this time.
 		}
 	}
 
@@ -220,15 +216,15 @@ func ExampleStartWithProgress() {
 	// (2). iocopy.EventStop received.
 	// (3). iocopy.EventOK received.
 	// The for-range loop exits when the channel is closed.
-	log.Printf("Example of StartWithProgress() - Part I: IO copy gouroutine exited and the event channel is closed")
+	log.Printf("Example of Start() - Part I: IO copy gouroutine exited and the event channel is closed")
 
-	// Example of StartWithProgress() - Part II.
+	// Example of Start() - Part II.
 	// ----------------------------------------------------------------------
 	// It shows how to resume the IO copy with the saved state.
 	// ----------------------------------------------------------------------
 
-	// Do HTTP request and get the HTTP response body and the content length.
-	resp2, toCopy, err := httputil.GetRespOfRangeStart(downloadURL, written)
+	// Do HTTP request and get the HTTP response body and the size of partial content.
+	resp2, sizeOfPartialContent, err := httputil.GetRespOfRangeStart(downloadURL, copied)
 	if err != nil {
 		log.Printf("GetRespOfRangeStart() error: %v", err)
 		log.Printf("it seems IO copy is done before timeout")
@@ -236,11 +232,8 @@ func ExampleStartWithProgress() {
 	}
 	defer resp2.Body.Close()
 
-	log.Printf("GetRespOfRangeStart(): 'bytes=%d-' for %v OK", written, downloadURL)
-	log.Printf("is size unknown: %v, size: %d, is range supported: %v",
-		isSizeUnknown,
-		toCopy,
-		isRangeSupported)
+	log.Printf("GetRespOfRangeStart(): 'bytes=%d-' for %v OK", copied, downloadURL)
+	log.Printf("size of partial content: %d", sizeOfPartialContent)
 
 	// Create a hash.Hash for SHA-256.
 	// hash.Hash is an io.Writer.
@@ -255,7 +248,7 @@ func ExampleStartWithProgress() {
 
 	// Start a goroutine to do IO copy.
 	// Read from response.Body and write to an hash.Hash to compute the hash.
-	ch2 := iocopy.StartWithProgress(
+	ch2 := iocopy.Start(
 		// Context
 		ctx2,
 		// Writer(dst)
@@ -266,27 +259,29 @@ func ExampleStartWithProgress() {
 		16*1024*1024,
 		// Interval to report the number of bytes copied
 		80*time.Millisecond,
+		// is total bytes to copy known
+		isTotalKnown,
 		// Number of bytes to copy
-		toCopy,
+		total,
 		// Number of bytes copied
 		copied)
 
-	log.Printf("Example of StartWithProgress() - Part II: IO copy gouroutine started.")
+	log.Printf("Example of Start() - Part II: IO copy gouroutine started.")
 
 	// Read the events from the channel.
 	for event := range ch2 {
 		switch ev := event.(type) {
 		case *iocopy.EventWritten:
 			// n bytes have been written successfully.
-			written = ev.Written()
-			log.Printf("on EventWritten: %d bytes written", written)
+			log.Printf("on EventWritten: %d bytes written, %d/%d(%.2f%%) bytes copied",
+				ev.Written(),
+				ev.Copied(),
+				ev.Total(),
+				ev.Percent(),
+			)
 
-		case *iocopy.EventProgress:
-			written = ev.Written()
-			log.Printf("on EventProgress:  %d/%d(%.2f%%) copied",
-				copied+written,
-				copied+toCopy,
-				ev.Percent())
+		case *iocopy.EventStop:
+			// Should not receive EventStop this time.
 
 		case *iocopy.EventError:
 			// an error occured.
@@ -294,8 +289,13 @@ func ExampleStartWithProgress() {
 
 		case *iocopy.EventOK:
 			// IO copy succeeded.
-			written = ev.Written()
-			log.Printf("on EventOK: %d bytes written", written)
+			ew := ev.EventWritten()
+			log.Printf("on EventOK: %d bytes written, %d/%d(%.2f%%) bytes copied",
+				ew.Written(),
+				ew.Copied(),
+				ew.Total(),
+				ew.Percent(),
+			)
 
 			// Get the final SHA-256 checksum of the remote file.
 			checksum := hash2.Sum(nil)
@@ -308,13 +308,14 @@ func ExampleStartWithProgress() {
 	// (2). iocopy.EventStop received.
 	// (3). iocopy.EventOK received.
 	// The for-range loop exits when the channel is closed.
-	log.Printf("Example of StartWithProgress() - Part II: IO copy gouroutine exited and the event channel is closed")
+	log.Printf("Example of Start() - Part II: IO copy gouroutine exited and the event channel is closed")
 
 	// Output:
 	// SHA-256:
 	// 9e2f2a4031b215922aa21a3695e30bbfa1f7707597834287415dbc862c6a3251
 }
 
+/*
 func ExampleCopyFile() {
 	type CopyParam struct {
 		Dst string
@@ -408,3 +409,4 @@ func ExampleCopyFileFS() {
 
 	// Output:
 }
+*/
