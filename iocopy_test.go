@@ -159,13 +159,13 @@ func ExampleStart() {
 		resp.Body,
 		// buffer size
 		16*1024*1024,
-		// interval to report the number of bytes copied
+		// interval to report the number of bytes written
 		80*time.Millisecond,
 		// is total bytes to copy known
 		isTotalKnown,
-		// number of bytes to copy
+		// total number of bytes to copy
 		total,
-		// number of bytes copied
+		// the number of bytes copied
 		copied)
 
 	log.Printf("Example of Start() - Part I: IO copy gouroutine started.")
@@ -185,7 +185,7 @@ func ExampleStart() {
 		case *iocopy.EventStop:
 			// Context is canceled or
 			// context's deadline exceeded.
-			// Set the number of bytes copied to the number of bytes written.
+			// Set the number of bytes copied.
 			ew := ev.EventWritten()
 			copied = ew.Copied()
 
@@ -249,21 +249,21 @@ func ExampleStart() {
 	// Start a goroutine to do IO copy.
 	// Read from response.Body and write to an hash.Hash to compute the hash.
 	ch2 := iocopy.Start(
-		// Context
+		// context
 		ctx2,
-		// Writer(dst)
+		// writer(dst)
 		hash2,
-		// Reader(src)
+		// reader(src)
 		resp2.Body,
-		// Buffer size
+		// buffer size
 		16*1024*1024,
-		// Interval to report the number of bytes copied
+		// interval to report the number of bytes written
 		80*time.Millisecond,
 		// is total bytes to copy known
 		isTotalKnown,
-		// Number of bytes to copy
+		// total number of bytes to copy
 		total,
-		// Number of bytes copied
+		// number of bytes copied
 		copied)
 
 	log.Printf("Example of Start() - Part II: IO copy gouroutine started.")
