@@ -194,7 +194,7 @@ func ExampleStart() {
 			state, _ = marshaler.MarshalBinary()
 
 			log.Printf("on EvnetStop(%v): %d bytes written, %d/%d(%.2f%%) copied. Saved hash state: %X",
-				ev.Err(),
+				ev.Cause(),
 				ew.Written(),
 				ew.Copied(),
 				ew.Total(),

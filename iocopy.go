@@ -21,9 +21,9 @@ const (
 // IO copy related events.
 // Available events:
 // (1). EventWritten - n bytes have been written successfully.
-// (2). EventError - an error occurs and the goroutine exits.
-// (3). EventStop - IO copy stopped.
-// (4). EventOK - IO copy succeeded.
+// (2). EventStop - IO copy stopped.
+// (3). EventOK - IO copy succeeded.
+// (4). EventError - an error occurs and the goroutine exits.
 type Event interface {
 	// stringer
 	String() string
@@ -65,7 +65,7 @@ func (e *EventWritten) Total() uint64 {
 	return e.total
 }
 
-// Copied returns the number of bytes copied previously.
+// PrevCopied returns the number of bytes copied previously.
 func (e *EventWritten) PrevCopied() uint64 {
 	return e.prevCopied
 }
@@ -92,25 +92,6 @@ func (e *EventWritten) Percent() float32 {
 	return ComputePercent(e.total, e.prevCopied, e.written, e.done)
 }
 
-// EventError is the event that an error occurs.
-type EventError struct {
-	err error
-}
-
-func newEventError(err error) *EventError {
-	return &EventError{err: err}
-}
-
-// String implements the stringer interface.
-func (e *EventError) String() string {
-	return e.err.Error()
-}
-
-// Err returns the error occured during IO copy.
-func (e *EventError) Err() error {
-	return e.err
-}
-
 // EventOK is the event that IO copy stopped.
 type EventStop struct {
 	err error
@@ -134,9 +115,8 @@ func (e *EventStop) EventWritten() *EventWritten {
 	return e.ew
 }
 
-// Err returns the the context error that explains why IO copying is stopped.
-// It can be context.Canceled or context.DeadlineExceeded.
-func (e *EventStop) Err() error {
+// Cause returns a non-nil error explaining why IO copying is canceled(stopped).
+func (e *EventStop) Cause() error {
 	return e.err
 }
 
@@ -157,6 +137,25 @@ func (e *EventOK) String() string {
 // EventWritten returns the associated EventWritten event.
 func (e *EventOK) EventWritten() *EventWritten {
 	return e.ew
+}
+
+// EventError is the event that an error occurs.
+type EventError struct {
+	err error
+}
+
+func newEventError(err error) *EventError {
+	return &EventError{err: err}
+}
+
+// String implements the stringer interface.
+func (e *EventError) String() string {
+	return e.err.Error()
+}
+
+// Err returns the error occured during IO copy.
+func (e *EventError) Err() error {
+	return e.err
 }
 
 // ComputePercent returns the percentage.
@@ -267,7 +266,6 @@ func cp(
 			runtime.Gosched()
 		}
 	}
-
 }
 
 // Start returns a channel for the caller to receive IO copy events and start a goroutine to do IO copy.
@@ -287,19 +285,6 @@ func cp(
 // The number of bytes to copy for this time = total - prevCopied.
 //
 // It returns a channel to receive IO copy events.
-// Available events:
-// (1). n bytes have been written successfully.
-// It'll send an EventWritten to the channel.
-//
-// (2). an error occured
-// It'll send an EventError to the channel and close the channel.
-//
-// (3). IO copy stopped(context is canceled or context's deadline exceeded).
-// It'll send an EventStop to the channel and close the channel.
-//
-// (4). IO copy succeeded.
-// It'll send an EventOK to the channel and close the channel.
-//
 // You may use a for-range loop to read events from the channel.
 func Start(
 	ctx context.Context,
