@@ -31,7 +31,12 @@ func ExampleNewCopyFileTask() {
 	}
 
 	// Create a copy file task.
-	t, err := iocopy.NewCopyFileTask("/tmp/go.pkg", "/tmp/go1.22.2.darwin-amd64.pkg")
+	t, err := iocopy.NewCopyFileTask(
+		// Dst
+		"/tmp/go.pkg",
+		// Src
+		"/tmp/go1.22.2.darwin-amd64.pkg",
+	)
 	if err != nil {
 		log.Printf("NewCopyFileTask() error: %v", err)
 		return
@@ -45,20 +50,27 @@ func ExampleNewCopyFileTask() {
 
 	// Do the task and block caller's go routine until the io copy go routine is done.
 	iocopy.Do(
+		// Context
 		ctx,
+		// Task
 		t,
+		// Buffer size
 		bufSize,
+		// On bytes written
 		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
 			log.Printf("on written: %d/%d(%.2f%%)", copied, total, percent)
 		},
+		// On stop
 		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, data []byte) {
 			log.Printf("on stop(%v): %d/%d(%.2f%%), data: %s", cause, copied, total, percent, string(data))
 			// Save data to resume copying.
 			savedData = data
 		},
+		// On ok
 		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
 			log.Printf("on ok: %d/%d(%.2f%%)", copied, total, percent)
 		},
+		// On error
 		func(err error) {
 			log.Printf("on error: %v", err)
 		},
@@ -75,18 +87,25 @@ func ExampleNewCopyFileTask() {
 
 	// Do the task and block caller's go routine until the io copy go routine is done.
 	iocopy.Do(
+		// Context
 		ctx,
+		// Task
 		t,
+		// Buffer size
 		bufSize,
+		// On bytes written
 		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
 			log.Printf("on written: %d/%d(%.2f%%)", copied, total, percent)
 		},
+		// On stop
 		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, data []byte) {
 			log.Printf("on stop(%v): %d/%d(%.2f%%), data: %s", cause, copied, total, percent, string(data))
 		},
+		// On ok
 		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
 			log.Printf("on ok: %d/%d(%.2f%%)", copied, total, percent)
 		},
+		// On error
 		func(err error) {
 			log.Printf("on error: %v", err)
 		},
