@@ -1,11 +1,9 @@
-package task
+package iocopy
 
 import (
 	"context"
 	"encoding/json"
 	"io"
-
-	"github.com/northbright/iocopy"
 )
 
 type OnWritten func(isTotalKnown bool, total, copied, written uint64, percent float32)
@@ -17,11 +15,11 @@ type OnOK func(isTotalKnown bool, total, copied, written uint64, percent float32
 type OnError func(err error)
 
 type Task interface {
-	Total() (bool, uint64)
-	Copied() uint64
-	SetCopied(copied uint64)
-	Writer() io.Writer
-	Reader() io.Reader
+	setCopied(copied uint64)
+	writer() io.Writer
+	reader() io.Reader
+	total() (bool, uint64)
+	copied() uint64
 	json.Marshaler
 	json.Unmarshaler
 }
@@ -34,27 +32,27 @@ func Do(
 	onStop OnStop,
 	onOK OnOK,
 	onError OnError) {
-	isTotalKnown, total := t.Total()
-	copied := t.Copied()
+	isTotalKnown, total := t.total()
+	copied := t.copied()
 
-	w := t.Writer()
+	w := t.writer()
 	wc, ok := w.(io.WriteCloser)
 	if ok {
 		defer wc.Close()
 	}
 
-	r := t.Reader()
+	r := t.reader()
 	rc, ok := r.(io.ReadCloser)
 	if ok {
 		defer rc.Close()
 	}
 
-	ch := iocopy.Start(
+	ch := Start(
 		ctx,
 		w,
 		r,
 		bufSize,
-		iocopy.DefaultInterval,
+		DefaultInterval,
 		isTotalKnown,
 		total,
 		copied,
@@ -63,7 +61,7 @@ func Do(
 	// Read the events from the channel.
 	for event := range ch {
 		switch ev := event.(type) {
-		case *iocopy.EventWritten:
+		case *EventWritten:
 			if onWritten != nil {
 				onWritten(
 					ev.IsTotalKnown(),
@@ -74,10 +72,10 @@ func Do(
 				)
 			}
 
-		case *iocopy.EventStop:
+		case *EventStop:
 			ew := ev.EventWritten()
 
-			t.SetCopied(ew.Copied())
+			t.setCopied(ew.Copied())
 
 			data, err := t.MarshalJSON()
 			if err != nil {
@@ -98,10 +96,10 @@ func Do(
 				}
 			}
 
-		case *iocopy.EventOK:
+		case *EventOK:
 			ew := ev.EventWritten()
 
-			t.SetCopied(ew.Copied())
+			t.setCopied(ew.Copied())
 
 			if onOK != nil {
 				onOK(
@@ -113,7 +111,7 @@ func Do(
 				)
 			}
 
-		case *iocopy.EventError:
+		case *EventError:
 			err := ev.Err()
 
 			if onError != nil {

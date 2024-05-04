@@ -1,4 +1,4 @@
-package copyfile
+package iocopy
 
 import (
 	"encoding/json"
@@ -9,15 +9,15 @@ import (
 	"github.com/northbright/pathelper"
 )
 
-type Task struct {
-	Dst       string    `json:"dst"`
-	Src       string    `json:"src"`
-	NumCopied uint64    `json:"copied",string`
-	w         io.Writer `json:"-"`
-	r         io.Reader `json:"-"`
+type CopyFileTask struct {
+	Dst    string    `json:"dst"`
+	Src    string    `json:"src"`
+	Copied uint64    `json:"copied",string`
+	w      io.Writer `json:"-"`
+	r      io.Reader `json:"-"`
 }
 
-func (t *Task) Total() (bool, uint64) {
+func (t *CopyFileTask) total() (bool, uint64) {
 	fi, err := os.Lstat(t.Src)
 	if err != nil {
 		return false, 0
@@ -26,31 +26,31 @@ func (t *Task) Total() (bool, uint64) {
 	return true, uint64(fi.Size())
 }
 
-func (t *Task) Copied() uint64 {
-	return t.NumCopied
+func (t *CopyFileTask) copied() uint64 {
+	return t.Copied
 }
 
-func (t *Task) SetCopied(copied uint64) {
-	t.NumCopied = copied
+func (t *CopyFileTask) setCopied(copied uint64) {
+	t.Copied = copied
 }
 
-func (t *Task) Writer() io.Writer {
+func (t *CopyFileTask) writer() io.Writer {
 	return t.w
 }
 
-func (t *Task) Reader() io.Reader {
+func (t *CopyFileTask) reader() io.Reader {
 	return t.r
 }
 
-func (t *Task) MarshalJSON() ([]byte, error) {
+func (t *CopyFileTask) MarshalJSON() ([]byte, error) {
 	// Use a local type(alias) to avoid infinite loop when call json.Marshal() in MarshalJSON().
-	type localTask Task
+	type localCopyFileTask CopyFileTask
 
-	a := (*localTask)(t)
+	a := (*localCopyFileTask)(t)
 	return json.Marshal(a)
 }
 
-func (t *Task) UnmarshalJSON(data []byte) error {
+func (t *CopyFileTask) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, t); err != nil {
 		return err
 	}
@@ -70,12 +70,12 @@ func (t *Task) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	if t.NumCopied != 0 {
-		if _, err = w.Seek(int64(t.NumCopied), 0); err != nil {
+	if t.Copied != 0 {
+		if _, err = w.Seek(int64(t.Copied), 0); err != nil {
 			return err
 		}
 
-		if _, err = r.Seek(int64(t.NumCopied), 0); err != nil {
+		if _, err = r.Seek(int64(t.Copied), 0); err != nil {
 			return err
 		}
 	}
@@ -86,7 +86,7 @@ func (t *Task) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func New(Dst, Src string) (*Task, error) {
+func NewCopyFileTask(Dst, Src string) (Task, error) {
 	dir := path.Dir(Dst)
 	if err := pathelper.CreateDirIfNotExists(dir, 0755); err != nil {
 		return nil, err
@@ -102,19 +102,19 @@ func New(Dst, Src string) (*Task, error) {
 		return nil, err
 	}
 
-	t := &Task{
-		Dst:       Dst,
-		Src:       Src,
-		NumCopied: 0,
-		w:         w,
-		r:         r,
+	t := &CopyFileTask{
+		Dst:    Dst,
+		Src:    Src,
+		Copied: 0,
+		w:      w,
+		r:      r,
 	}
 
 	return t, nil
 }
 
-func Load(data []byte) (*Task, error) {
-	t := &Task{}
+func LoadCopyFileTask(data []byte) (Task, error) {
+	t := &CopyFileTask{}
 
 	if err := t.UnmarshalJSON(data); err != nil {
 		return nil, err
