@@ -1,8 +1,11 @@
 package iocopy
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"log"
 	"os"
 	"path"
 
@@ -51,7 +54,12 @@ func (t *CopyFileTask) MarshalJSON() ([]byte, error) {
 }
 
 func (t *CopyFileTask) UnmarshalJSON(data []byte) error {
-	if err := json.Unmarshal(data, t); err != nil {
+	// Use a local type(alias) to avoid infinite loop when call json.Marshal() in MarshalJSON().
+	type localCopyFileTask CopyFileTask
+
+	a := (*localCopyFileTask)(t)
+
+	if err := json.Unmarshal(data, a); err != nil {
 		return err
 	}
 
@@ -121,4 +129,37 @@ func LoadCopyFileTask(data []byte) (Task, error) {
 	}
 
 	return t, nil
+}
+
+func CopyFile(ctx context.Context, Dst, Src string, bufSize uint) error {
+	var (
+		err = fmt.Errorf("unexpected behavior")
+	)
+	t, err := NewCopyFileTask(Dst, Src)
+	if err != nil {
+		log.Printf("NewCopyFileTask() error: %v", err)
+		return err
+	}
+
+	if bufSize == 0 {
+		bufSize = DefaultBufSize
+	}
+
+	Do(
+		ctx,
+		t,
+		bufSize,
+		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
+		},
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, data []byte) {
+			err = cause
+		},
+		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
+			err = nil
+		},
+		func(e error) {
+			err = e
+		},
+	)
+	return err
 }
