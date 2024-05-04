@@ -13,20 +13,16 @@ import (
 )
 
 type CopyFileTask struct {
-	Dst    string    `json:"dst"`
-	Src    string    `json:"src"`
-	Copied uint64    `json:"copied",string`
-	w      io.Writer `json:"-"`
-	r      io.Reader `json:"-"`
+	Dst    string   `json:"dst"`
+	Src    string   `json:"src"`
+	Size   uint64   `json:"size", string`
+	Copied uint64   `json:"copied",string`
+	fw     *os.File `json:"-"`
+	fr     *os.File `json:"-"`
 }
 
 func (t *CopyFileTask) total() (bool, uint64) {
-	fi, err := os.Lstat(t.Src)
-	if err != nil {
-		return false, 0
-	}
-
-	return true, uint64(fi.Size())
+	return true, t.Size
 }
 
 func (t *CopyFileTask) copied() uint64 {
@@ -38,11 +34,11 @@ func (t *CopyFileTask) setCopied(copied uint64) {
 }
 
 func (t *CopyFileTask) writer() io.Writer {
-	return t.w
+	return t.fw
 }
 
 func (t *CopyFileTask) reader() io.Reader {
-	return t.r
+	return t.fr
 }
 
 func (t *CopyFileTask) MarshalJSON() ([]byte, error) {
@@ -68,44 +64,59 @@ func (t *CopyFileTask) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	w, err := os.OpenFile(t.Dst, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	fw, err := os.OpenFile(t.Dst, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 
-	r, err := os.Open(t.Src)
+	fr, err := os.Open(t.Src)
 	if err != nil {
 		return err
 	}
 
 	if t.Copied != 0 {
-		if _, err = w.Seek(int64(t.Copied), 0); err != nil {
+		if _, err = fw.Seek(int64(t.Copied), 0); err != nil {
 			return err
 		}
 
-		if _, err = r.Seek(int64(t.Copied), 0); err != nil {
+		if _, err = fr.Seek(int64(t.Copied), 0); err != nil {
 			return err
 		}
 	}
 
-	t.w = w
-	t.r = r
+	t.fw = fw
+	t.fr = fr
 
 	return nil
 }
 
 func NewCopyFileTask(Dst, Src string) (Task, error) {
+	// Get src file info.
+	fi, err := os.Lstat(Src)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if src's a regular file.
+	if !fi.Mode().IsRegular() {
+		return nil, fmt.Errorf("src's not a regular file")
+	}
+
+	// Get the source file's size.
+	size := uint64(fi.Size())
+
+	// Make dest file's dir if it does not exist.
 	dir := path.Dir(Dst)
 	if err := pathelper.CreateDirIfNotExists(dir, 0755); err != nil {
 		return nil, err
 	}
 
-	w, err := os.Create(Dst)
+	fw, err := os.Create(Dst)
 	if err != nil {
 		return nil, err
 	}
 
-	r, err := os.Open(Src)
+	fr, err := os.Open(Src)
 	if err != nil {
 		return nil, err
 	}
@@ -113,9 +124,10 @@ func NewCopyFileTask(Dst, Src string) (Task, error) {
 	t := &CopyFileTask{
 		Dst:    Dst,
 		Src:    Src,
+		Size:   size,
 		Copied: 0,
-		w:      w,
-		r:      r,
+		fw:     fw,
+		fr:     fr,
 	}
 
 	return t, nil
