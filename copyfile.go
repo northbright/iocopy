@@ -15,8 +15,8 @@ import (
 type CopyFileTask struct {
 	Dst    string   `json:"dst"`
 	Src    string   `json:"src"`
-	Size   uint64   `json:"size", string`
-	Copied uint64   `json:"copied",string`
+	Size   uint64   `json:"size,string"`
+	Copied uint64   `json:"copied,string"`
 	fw     *os.File `json:"-"`
 	fr     *os.File `json:"-"`
 }
@@ -50,42 +50,41 @@ func (t *CopyFileTask) MarshalJSON() ([]byte, error) {
 }
 
 func (t *CopyFileTask) UnmarshalJSON(data []byte) error {
+	var err error
+
 	// Use a local type(alias) to avoid infinite loop when call json.Marshal() in MarshalJSON().
 	type localCopyFileTask CopyFileTask
 
 	a := (*localCopyFileTask)(t)
 
-	if err := json.Unmarshal(data, a); err != nil {
+	if err = json.Unmarshal(data, a); err != nil {
 		return err
 	}
 
 	dir := path.Dir(t.Dst)
-	if err := pathelper.CreateDirIfNotExists(dir, 0755); err != nil {
+	if err = pathelper.CreateDirIfNotExists(dir, 0755); err != nil {
 		return err
 	}
 
-	fw, err := os.OpenFile(t.Dst, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	t.fw, err = os.OpenFile(t.Dst, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 
-	fr, err := os.Open(t.Src)
+	t.fr, err = os.Open(t.Src)
 	if err != nil {
 		return err
 	}
 
 	if t.Copied != 0 {
-		if _, err = fw.Seek(int64(t.Copied), 0); err != nil {
+		if _, err = t.fw.Seek(int64(t.Copied), 0); err != nil {
 			return err
 		}
 
-		if _, err = fr.Seek(int64(t.Copied), 0); err != nil {
+		if _, err = t.fr.Seek(int64(t.Copied), 0); err != nil {
 			return err
 		}
 	}
-
-	t.fw = fw
-	t.fr = fr
 
 	return nil
 }

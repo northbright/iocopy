@@ -15,14 +15,14 @@ import (
 )
 
 type DownloadTask struct {
-	Dst              string    `json:"dst"`
-	Url              string    `json:"url"`
-	IsSizeKnown      bool      `json:"is_size_known"`
-	Size             uint64    `json:"size"`
-	IsRangeSupported bool      `json:"is_range_supported"`
-	Downloaded       uint64    `json:"downloaded",string`
-	w                io.Writer `json:"-"`
-	r                io.Reader `json:"-"`
+	Dst              string         `json:"dst"`
+	Url              string         `json:"url"`
+	IsSizeKnown      bool           `json:"is_size_known"`
+	Size             uint64         `json:"size"`
+	IsRangeSupported bool           `json:"is_range_supported"`
+	Downloaded       uint64         `json:"downloaded,string"`
+	fw               *os.File       `json:"-"`
+	resp             *http.Response `json:"-"`
 }
 
 func (t *DownloadTask) total() (bool, uint64) {
@@ -38,11 +38,11 @@ func (t *DownloadTask) setCopied(copied uint64) {
 }
 
 func (t *DownloadTask) writer() io.Writer {
-	return t.w
+	return t.fw
 }
 
 func (t *DownloadTask) reader() io.Reader {
-	return t.r
+	return t.resp.Body
 }
 
 func (t *DownloadTask) MarshalJSON() ([]byte, error) {
@@ -54,9 +54,7 @@ func (t *DownloadTask) MarshalJSON() ([]byte, error) {
 }
 
 func (t *DownloadTask) UnmarshalJSON(data []byte) error {
-	var (
-		resp *http.Response
-	)
+	var err error
 
 	// Use a local type(alias) to avoid infinite loop when call json.Marshal() in MarshalJSON().
 	type localDownloadTask DownloadTask
@@ -71,14 +69,14 @@ func (t *DownloadTask) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	w, err := os.OpenFile(t.Dst, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	t.fw, err = os.OpenFile(t.Dst, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 
 	// Check if it can resume downloading.
 	if !t.IsRangeSupported {
-		resp, t.IsSizeKnown, t.Size, t.IsRangeSupported, err = httputil.GetResp(t.Url)
+		t.resp, t.IsSizeKnown, t.Size, t.IsRangeSupported, err = httputil.GetResp(t.Url)
 		if err != nil {
 			return err
 		}
@@ -86,18 +84,15 @@ func (t *DownloadTask) UnmarshalJSON(data []byte) error {
 		// Reset number of bytes downloaded to 0.
 		t.Downloaded = 0
 	} else {
-		resp, _, err = httputil.GetRespOfRangeStart(t.Url, t.Downloaded)
+		t.resp, _, err = httputil.GetRespOfRangeStart(t.Url, t.Downloaded)
 		if err != nil {
 			return err
 		}
 
-		if _, err = w.Seek(int64(t.Downloaded), 0); err != nil {
+		if _, err = t.fw.Seek(int64(t.Downloaded), 0); err != nil {
 			return err
 		}
 	}
-
-	t.w = w
-	t.r = resp.Body
 
 	return nil
 }
@@ -113,7 +108,7 @@ func NewDownloadTask(Dst, Url string) (Task, error) {
 		return nil, err
 	}
 
-	w, err := os.Create(Dst)
+	fw, err := os.Create(Dst)
 	if err != nil {
 		return nil, err
 	}
@@ -125,8 +120,8 @@ func NewDownloadTask(Dst, Url string) (Task, error) {
 		Size:             size,
 		IsRangeSupported: isRangeSupported,
 		Downloaded:       0,
-		w:                w,
-		r:                resp.Body,
+		fw:               fw,
+		resp:             resp,
 	}
 
 	return t, nil
