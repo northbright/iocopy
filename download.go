@@ -53,50 +53,6 @@ func (t *DownloadTask) MarshalJSON() ([]byte, error) {
 	return json.Marshal(a)
 }
 
-func (t *DownloadTask) UnmarshalJSON(data []byte) error {
-	var err error
-
-	// Use a local type(alias) to avoid infinite loop when call json.Marshal() in MarshalJSON().
-	type localDownloadTask DownloadTask
-	a := (*localDownloadTask)(t)
-
-	if err := json.Unmarshal(data, a); err != nil {
-		return err
-	}
-
-	dir := path.Dir(t.Dst)
-	if err := pathelper.CreateDirIfNotExists(dir, 0755); err != nil {
-		return err
-	}
-
-	t.fw, err = os.OpenFile(t.Dst, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-
-	// Check if it can resume downloading.
-	if !t.IsRangeSupported {
-		t.resp, t.IsSizeKnown, t.Size, t.IsRangeSupported, err = httputil.GetResp(t.Url)
-		if err != nil {
-			return err
-		}
-
-		// Reset number of bytes downloaded to 0.
-		t.Downloaded = 0
-	} else {
-		t.resp, _, err = httputil.GetRespOfRangeStart(t.Url, t.Downloaded)
-		if err != nil {
-			return err
-		}
-
-		if _, err = t.fw.Seek(int64(t.Downloaded), 0); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func NewDownloadTask(Dst, Url string) (Task, error) {
 	resp, isSizeKnown, size, isRangeSupported, err := httputil.GetResp(Url)
 	if err != nil {
@@ -128,10 +84,42 @@ func NewDownloadTask(Dst, Url string) (Task, error) {
 }
 
 func LoadDownloadTask(data []byte) (Task, error) {
+	var err error
+
 	t := &DownloadTask{}
 
-	if err := t.UnmarshalJSON(data); err != nil {
+	if err = json.Unmarshal(data, t); err != nil {
 		return nil, err
+	}
+
+	dir := path.Dir(t.Dst)
+	if err := pathelper.CreateDirIfNotExists(dir, 0755); err != nil {
+		return nil, err
+	}
+
+	t.fw, err = os.OpenFile(t.Dst, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if it can resume downloading.
+	if !t.IsRangeSupported {
+		t.resp, t.IsSizeKnown, t.Size, t.IsRangeSupported, err = httputil.GetResp(t.Url)
+		if err != nil {
+			return nil, err
+		}
+
+		// Reset number of bytes downloaded to 0.
+		t.Downloaded = 0
+	} else {
+		t.resp, _, err = httputil.GetRespOfRangeStart(t.Url, t.Downloaded)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, err = t.fw.Seek(int64(t.Downloaded), 0); err != nil {
+			return nil, err
+		}
 	}
 
 	return t, nil

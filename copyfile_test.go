@@ -63,7 +63,7 @@ func ExampleNewCopyFileTask() {
 		// On stop
 		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, data []byte) {
 			log.Printf("on stop(%v): %d/%d(%.2f%%), data: %s", cause, copied, total, percent, string(data))
-			// Save data to resume copying.
+			// Save the data to resume copying.
 			savedData = data
 		},
 		// On ok
@@ -76,7 +76,7 @@ func ExampleNewCopyFileTask() {
 		},
 	)
 
-	// Load saved data to resume copying.
+	// Load the task from the saved data and resume copying.
 	t, err = iocopy.LoadCopyFileTask(savedData)
 	if err != nil {
 		log.Printf("LoadCopyFileTask() error: %v", err)

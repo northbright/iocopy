@@ -49,46 +49,6 @@ func (t *CopyFileTask) MarshalJSON() ([]byte, error) {
 	return json.Marshal(a)
 }
 
-func (t *CopyFileTask) UnmarshalJSON(data []byte) error {
-	var err error
-
-	// Use a local type(alias) to avoid infinite loop when call json.Marshal() in MarshalJSON().
-	type localCopyFileTask CopyFileTask
-
-	a := (*localCopyFileTask)(t)
-
-	if err = json.Unmarshal(data, a); err != nil {
-		return err
-	}
-
-	dir := path.Dir(t.Dst)
-	if err = pathelper.CreateDirIfNotExists(dir, 0755); err != nil {
-		return err
-	}
-
-	t.fw, err = os.OpenFile(t.Dst, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-
-	t.fr, err = os.Open(t.Src)
-	if err != nil {
-		return err
-	}
-
-	if t.Copied != 0 {
-		if _, err = t.fw.Seek(int64(t.Copied), 0); err != nil {
-			return err
-		}
-
-		if _, err = t.fr.Seek(int64(t.Copied), 0); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func NewCopyFileTask(Dst, Src string) (Task, error) {
 	// Get src file info.
 	fi, err := os.Lstat(Src)
@@ -133,10 +93,37 @@ func NewCopyFileTask(Dst, Src string) (Task, error) {
 }
 
 func LoadCopyFileTask(data []byte) (Task, error) {
+	var err error
+
 	t := &CopyFileTask{}
 
-	if err := t.UnmarshalJSON(data); err != nil {
+	if err = json.Unmarshal(data, t); err != nil {
 		return nil, err
+	}
+
+	dir := path.Dir(t.Dst)
+	if err = pathelper.CreateDirIfNotExists(dir, 0755); err != nil {
+		return nil, err
+	}
+
+	t.fw, err = os.OpenFile(t.Dst, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	t.fr, err = os.Open(t.Src)
+	if err != nil {
+		return nil, err
+	}
+
+	if t.Copied != 0 {
+		if _, err = t.fw.Seek(int64(t.Copied), 0); err != nil {
+			return nil, err
+		}
+
+		if _, err = t.fr.Seek(int64(t.Copied), 0); err != nil {
+			return nil, err
+		}
 	}
 
 	return t, nil

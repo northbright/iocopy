@@ -21,7 +21,6 @@ type Task interface {
 	total() (bool, uint64)
 	copied() uint64
 	json.Marshaler
-	json.Unmarshaler
 }
 
 func Do(

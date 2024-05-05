@@ -46,7 +46,7 @@ func ExampleNewDownloadTask() {
 		// On stop
 		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, data []byte) {
 			log.Printf("on stop(%v): %d/%d(%.2f%%), data: %s", cause, copied, total, percent, string(data))
-			// Save data for resuming downloading.
+			// Save the data for resuming downloading.
 			savedData = data
 		},
 		// On ok
@@ -59,7 +59,7 @@ func ExampleNewDownloadTask() {
 		},
 	)
 
-	// Load saved data to resume downloading.
+	// Load the task from the saved data and resume downloading.
 	t, err = iocopy.LoadDownloadTask(savedData)
 	if err != nil {
 		log.Printf("LoadDownloadTask() error: %v", err)
