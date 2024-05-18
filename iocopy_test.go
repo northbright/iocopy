@@ -3,7 +3,6 @@ package iocopy_test
 import (
 	"context"
 	"crypto/sha256"
-	"embed"
 	"encoding"
 	"fmt"
 	"log"
@@ -11,11 +10,6 @@ import (
 
 	"github.com/northbright/httputil"
 	"github.com/northbright/iocopy"
-)
-
-var (
-	//go:embed README.md
-	embededFiles embed.FS
 )
 
 /*
