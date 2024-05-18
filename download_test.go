@@ -3,6 +3,8 @@ package iocopy_test
 import (
 	"context"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/northbright/iocopy"
@@ -13,12 +15,15 @@ func ExampleNewDownloadTask() {
 		savedData []byte
 	)
 
+	dst := filepath.Join(os.TempDir(), "go1.22.2.darwin-amd64.pkg")
+	url := "https://golang.google.cn/dl/go1.22.2.darwin-amd64.pkg"
+
 	// Create a download task.
 	t, err := iocopy.NewDownloadTask(
-		// Dst
-		"/tmp/go1.22.2.darwin-amd64.pkg",
+		// Destination
+		dst,
 		// Url
-		"https://golang.google.cn/dl/go1.22.2.darwin-amd64.pkg",
+		url,
 	)
 	if err != nil {
 		log.Printf("NewDownloadTask() error: %v", err)
@@ -94,5 +99,9 @@ func ExampleNewDownloadTask() {
 		},
 	)
 
+	// Remove the files after test's done.
+	os.Remove(dst)
+
 	// Output:
+
 }
