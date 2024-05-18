@@ -49,9 +49,9 @@ func (t *CopyFileTask) MarshalJSON() ([]byte, error) {
 	return json.Marshal(a)
 }
 
-func NewCopyFileTask(Dst, Src string) (Task, error) {
+func NewCopyFileTask(dst, src string) (Task, error) {
 	// Get src file info.
-	fi, err := os.Lstat(Src)
+	fi, err := os.Lstat(src)
 	if err != nil {
 		return nil, err
 	}
@@ -65,24 +65,24 @@ func NewCopyFileTask(Dst, Src string) (Task, error) {
 	size := uint64(fi.Size())
 
 	// Make dest file's dir if it does not exist.
-	dir := path.Dir(Dst)
+	dir := path.Dir(dst)
 	if err := pathelper.CreateDirIfNotExists(dir, 0755); err != nil {
 		return nil, err
 	}
 
-	fw, err := os.Create(Dst)
+	fw, err := os.Create(dst)
 	if err != nil {
 		return nil, err
 	}
 
-	fr, err := os.Open(Src)
+	fr, err := os.Open(src)
 	if err != nil {
 		return nil, err
 	}
 
 	t := &CopyFileTask{
-		Dst:    Dst,
-		Src:    Src,
+		Dst:    dst,
+		Src:    src,
 		Size:   size,
 		Copied: 0,
 		fw:     fw,
@@ -129,11 +129,11 @@ func LoadCopyFileTask(data []byte) (Task, error) {
 	return t, nil
 }
 
-func CopyFile(ctx context.Context, Dst, Src string, bufSize uint) error {
+func CopyFile(ctx context.Context, dst, src string, bufSize uint) error {
 	var (
 		err = fmt.Errorf("unexpected behavior")
 	)
-	t, err := NewCopyFileTask(Dst, Src)
+	t, err := NewCopyFileTask(dst, src)
 	if err != nil {
 		log.Printf("NewCopyFileTask() error: %v", err)
 		return err

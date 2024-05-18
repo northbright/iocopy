@@ -53,25 +53,25 @@ func (t *DownloadTask) MarshalJSON() ([]byte, error) {
 	return json.Marshal(a)
 }
 
-func NewDownloadTask(Dst, Url string) (Task, error) {
-	resp, isSizeKnown, size, isRangeSupported, err := httputil.GetResp(Url)
+func NewDownloadTask(dst, url string) (Task, error) {
+	resp, isSizeKnown, size, isRangeSupported, err := httputil.GetResp(url)
 	if err != nil {
 		return nil, err
 	}
 
-	dir := path.Dir(Dst)
+	dir := path.Dir(dst)
 	if err := pathelper.CreateDirIfNotExists(dir, 0755); err != nil {
 		return nil, err
 	}
 
-	fw, err := os.Create(Dst)
+	fw, err := os.Create(dst)
 	if err != nil {
 		return nil, err
 	}
 
 	t := &DownloadTask{
-		Dst:              Dst,
-		Url:              Url,
+		Dst:              dst,
+		Url:              url,
 		IsSizeKnown:      isSizeKnown,
 		Size:             size,
 		IsRangeSupported: isRangeSupported,
@@ -125,11 +125,11 @@ func LoadDownloadTask(data []byte) (Task, error) {
 	return t, nil
 }
 
-func Download(ctx context.Context, Dst, Url string, bufSize uint) error {
+func Download(ctx context.Context, dst, url string, bufSize uint) error {
 	var (
 		err = fmt.Errorf("unexpected behavior")
 	)
-	t, err := NewDownloadTask(Dst, Url)
+	t, err := NewDownloadTask(dst, url)
 	if err != nil {
 		log.Printf("NewDownloadTask() error: %v", err)
 		return err
