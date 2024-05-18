@@ -133,6 +133,36 @@ func ExampleNewCopyFileTask() {
 	// Output:
 }
 
+func ExampleCopyFile() {
+	ctx := context.Background()
+	dst := filepath.Join(os.TempDir(), "README.md")
+	src := "README.md"
+	bufSize := uint(4 * 1024)
+
+	err := iocopy.CopyFile(
+		// Context
+		ctx,
+		// Destination file
+		dst,
+		// Source file
+		src,
+		// Buffer size
+		bufSize,
+	)
+
+	if err != nil {
+		log.Printf("CopyFile() error: %v", err)
+		return
+	}
+
+	log.Printf("CopyFile() ok")
+
+	// Remove the files after test's done.
+	os.Remove(dst)
+
+	// Output:
+}
+
 func ExampleNewCopyFileFromFSTask() {
 	ctx := context.Background()
 	dst := filepath.Join(os.TempDir(), "README.md")
