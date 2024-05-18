@@ -105,3 +105,22 @@ func ExampleNewDownloadTask() {
 	// Output:
 
 }
+
+func ExampleDownload() {
+	ctx := context.Background()
+	dst := filepath.Join(os.TempDir(), "go1.22.2.darwin-amd64.pkg")
+	url := "https://golang.google.cn/dl/go1.22.2.darwin-amd64.pkg"
+	bufSize := uint(4 * 1024)
+
+	if err := iocopy.Download(ctx, dst, url, bufSize); err != nil {
+		log.Printf("Download() error: %v", err)
+		return
+	}
+
+	log.Printf("Download() ok")
+
+	// Remove the files after test's done.
+	os.Remove(dst)
+
+	// Output:
+}
