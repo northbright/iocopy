@@ -18,7 +18,7 @@ var (
 
 func ExampleNewCopyFileTask() {
 	var (
-		savedData []byte
+		savedState []byte
 	)
 
 	dst := filepath.Join(os.TempDir(), "go1.22.2.darwin-amd64.pkg")
@@ -76,10 +76,10 @@ func ExampleNewCopyFileTask() {
 			log.Printf("on written: %d/%d(%.2f%%)", copied, total, percent)
 		},
 		// On stop
-		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, data []byte) {
-			log.Printf("on stop(%v): %d/%d(%.2f%%), data: %s", cause, copied, total, percent, string(data))
-			// Save the data to resume copying.
-			savedData = data
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte) {
+			log.Printf("on stop(%v): %d/%d(%.2f%%), state: %s", cause, copied, total, percent, string(state))
+			// Save the state to resume copying.
+			savedState = state
 		},
 		// On ok
 		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
@@ -91,8 +91,8 @@ func ExampleNewCopyFileTask() {
 		},
 	)
 
-	// Load the task from the saved data and resume copying.
-	t, err = iocopy.LoadCopyFileTask(savedData)
+	// Load the task from the saved state and resume copying.
+	t, err = iocopy.LoadCopyFileTask(savedState)
 	if err != nil {
 		log.Printf("LoadCopyFileTask() error: %v", err)
 		return
@@ -113,8 +113,8 @@ func ExampleNewCopyFileTask() {
 			log.Printf("on written: %d/%d(%.2f%%)", copied, total, percent)
 		},
 		// On stop
-		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, data []byte) {
-			log.Printf("on stop(%v): %d/%d(%.2f%%), data: %s", cause, copied, total, percent, string(data))
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte) {
+			log.Printf("on stop(%v): %d/%d(%.2f%%), state: %s", cause, copied, total, percent, string(state))
 		},
 		// On ok
 		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
@@ -188,8 +188,8 @@ func ExampleNewCopyFileFromFSTask() {
 			log.Printf("on written: %d/%d(%.2f%%)", copied, total, percent)
 		},
 		// On stop
-		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, data []byte) {
-			log.Printf("on stop(%v): %d/%d(%.2f%%), data: %s", cause, copied, total, percent, string(data))
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte) {
+			log.Printf("on stop(%v): %d/%d(%.2f%%), state: %s", cause, copied, total, percent, string(state))
 		},
 		// On ok
 		func(isTotalKnown bool, total, copied, written uint64, percent float32) {

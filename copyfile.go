@@ -42,12 +42,8 @@ func (t *CopyFileTask) reader() io.Reader {
 	return t.r
 }
 
-func (t *CopyFileTask) MarshalJSON() ([]byte, error) {
-	// Use a local type(alias) to avoid infinite loop when call json.Marshal() in MarshalJSON().
-	type localCopyFileTask CopyFileTask
-
-	a := (*localCopyFileTask)(t)
-	return json.Marshal(a)
+func (t *CopyFileTask) state() ([]byte, error) {
+	return json.Marshal(t)
 }
 
 func NewCopyFileTask(dst, src string) (Task, error) {
@@ -93,12 +89,12 @@ func NewCopyFileTask(dst, src string) (Task, error) {
 	return t, nil
 }
 
-func LoadCopyFileTask(data []byte) (Task, error) {
+func LoadCopyFileTask(state []byte) (Task, error) {
 	var err error
 
 	t := &CopyFileTask{}
 
-	if err = json.Unmarshal(data, t); err != nil {
+	if err = json.Unmarshal(state, t); err != nil {
 		return nil, err
 	}
 
@@ -153,7 +149,7 @@ func CopyFile(ctx context.Context, dst, src string, bufSize uint) error {
 		bufSize,
 		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
 		},
-		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, data []byte) {
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte) {
 			err = cause
 		},
 		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
@@ -227,7 +223,7 @@ func CopyFileFromFS(ctx context.Context, dst string, srcFS fs.FS, src string, bu
 		bufSize,
 		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
 		},
-		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, data []byte) {
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte) {
 			err = cause
 		},
 		func(isTotalKnown bool, total, copied, written uint64, percent float32) {

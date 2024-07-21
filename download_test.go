@@ -12,7 +12,7 @@ import (
 
 func ExampleNewDownloadTask() {
 	var (
-		savedData []byte
+		savedState []byte
 	)
 
 	dst := filepath.Join(os.TempDir(), "go1.22.2.darwin-amd64.pkg")
@@ -49,10 +49,10 @@ func ExampleNewDownloadTask() {
 			log.Printf("on written: %d/%d(%.2f%%)", copied, total, percent)
 		},
 		// On stop
-		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, data []byte) {
-			log.Printf("on stop(%v): %d/%d(%.2f%%), data: %s", cause, copied, total, percent, string(data))
-			// Save the data for resuming downloading.
-			savedData = data
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte) {
+			log.Printf("on stop(%v): %d/%d(%.2f%%), state: %s", cause, copied, total, percent, string(state))
+			// Save the state for resuming downloading.
+			savedState = state
 		},
 		// On ok
 		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
@@ -64,8 +64,8 @@ func ExampleNewDownloadTask() {
 		},
 	)
 
-	// Load the task from the saved data and resume downloading.
-	t, err = iocopy.LoadDownloadTask(savedData)
+	// Load the task from the saved state and resume downloading.
+	t, err = iocopy.LoadDownloadTask(savedState)
 	if err != nil {
 		log.Printf("LoadDownloadTask() error: %v", err)
 		return
@@ -86,8 +86,8 @@ func ExampleNewDownloadTask() {
 			log.Printf("on written: %d/%d(%.2f%%)", copied, total, percent)
 		},
 		// On stop
-		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, data []byte) {
-			log.Printf("on stop(%v): %d/%d(%.2f%%), data: %s", cause, copied, total, percent, string(data))
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte) {
+			log.Printf("on stop(%v): %d/%d(%.2f%%), state: %s", cause, copied, total, percent, string(state))
 		},
 		// On ok
 		func(isTotalKnown bool, total, copied, written uint64, percent float32) {

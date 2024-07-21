@@ -2,13 +2,12 @@ package iocopy
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 )
 
 type OnWritten func(isTotalKnown bool, total, copied, written uint64, percent float32)
 
-type OnStop func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, data []byte)
+type OnStop func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte)
 
 type OnOK func(isTotalKnown bool, total, copied, written uint64, percent float32)
 
@@ -20,7 +19,7 @@ type Task interface {
 	reader() io.Reader
 	total() (bool, uint64)
 	copied() uint64
-	json.Marshaler
+	state() ([]byte, error)
 }
 
 func Do(
@@ -76,7 +75,7 @@ func Do(
 
 			t.setCopied(ew.Copied())
 
-			data, err := t.MarshalJSON()
+			state, err := t.state()
 			if err != nil {
 				if onError != nil {
 					onError(err)
@@ -90,7 +89,7 @@ func Do(
 						ew.Written(),
 						ew.Percent(),
 						ev.Cause(),
-						data,
+						state,
 					)
 				}
 			}
