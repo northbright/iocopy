@@ -162,6 +162,8 @@ func CopyFile(ctx context.Context, dst, src string, bufSize uint) error {
 	return err
 }
 
+// NewCopyFileFromFSTask creates a task for copying file from fs.FS.
+// There's no function to load a task for resuming coping file from fs.FS because io.ReadAt or io.Seeker is optional for fs.File interface.
 func NewCopyFileFromFSTask(dst string, srcFS fs.FS, src string) (Task, error) {
 	// Open src file.
 	fr, err := srcFS.Open(src)
