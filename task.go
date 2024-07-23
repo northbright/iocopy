@@ -14,12 +14,11 @@ type OnOK func(isTotalKnown bool, total, copied, written uint64, percent float32
 type OnError func(err error)
 
 type Task interface {
-	setCopied(copied uint64)
 	writer() io.Writer
 	reader() io.Reader
 	total() (bool, uint64)
 	copied() uint64
-	state() ([]byte, error)
+	state(copied uint64) ([]byte, error)
 }
 
 func Do(
@@ -73,9 +72,7 @@ func Do(
 		case *EventStop:
 			ew := ev.EventWritten()
 
-			t.setCopied(ew.Copied())
-
-			state, err := t.state()
+			state, err := t.state(ew.Copied())
 			if err != nil {
 				if onError != nil {
 					onError(err)
@@ -96,8 +93,6 @@ func Do(
 
 		case *EventOK:
 			ew := ev.EventWritten()
-
-			t.setCopied(ew.Copied())
 
 			if onOK != nil {
 				onOK(

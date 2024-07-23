@@ -30,10 +30,6 @@ func (t *CopyFileTask) copied() uint64 {
 	return t.Copied
 }
 
-func (t *CopyFileTask) setCopied(copied uint64) {
-	t.Copied = copied
-}
-
 func (t *CopyFileTask) writer() io.Writer {
 	return t.w
 }
@@ -42,7 +38,8 @@ func (t *CopyFileTask) reader() io.Reader {
 	return t.r
 }
 
-func (t *CopyFileTask) state() ([]byte, error) {
+func (t *CopyFileTask) state(copied uint64) ([]byte, error) {
+	t.Copied = copied
 	return json.Marshal(t)
 }
 
