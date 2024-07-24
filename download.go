@@ -18,7 +18,7 @@ type DownloadTask struct {
 	Dst              string         `json:"dst"`
 	Url              string         `json:"url"`
 	IsSizeKnown      bool           `json:"is_size_known"`
-	Size             uint64         `json:"size"`
+	Size             uint64         `json:"size,string"`
 	IsRangeSupported bool           `json:"is_range_supported"`
 	Downloaded       uint64         `json:"downloaded,string"`
 	fw               *os.File       `json:"-"`
