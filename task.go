@@ -18,7 +18,8 @@ type Task interface {
 	reader() io.Reader
 	total() (bool, uint64)
 	copied() uint64
-	state(copied uint64) ([]byte, error)
+	setCopied(uint64)
+	state() ([]byte, error)
 }
 
 func Do(
@@ -72,7 +73,9 @@ func Do(
 		case *EventStop:
 			ew := ev.EventWritten()
 
-			state, err := t.state(ew.Copied())
+			t.setCopied(ew.Copied())
+
+			state, err := t.state()
 			if err != nil {
 				if onError != nil {
 					onError(err)
@@ -93,6 +96,8 @@ func Do(
 
 		case *EventOK:
 			ew := ev.EventWritten()
+
+			t.setCopied(ew.Copied())
 
 			if onOK != nil {
 				onOK(
