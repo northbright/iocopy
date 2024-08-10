@@ -50,13 +50,13 @@ func ExampleNewDownloadTask() {
 		},
 		// On stop
 		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte) {
-			log.Printf("on stop(%v): %d/%d(%.2f%%), state: %s", cause, copied, total, percent, string(state))
+			log.Printf("on stop(%v): %d/%d(%.2f%%)\nstate: %s", cause, copied, total, percent, string(state))
 			// Save the state for resuming downloading.
 			savedState = state
 		},
 		// On ok
-		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
-			log.Printf("on ok: %d/%d(%.2f%%)", copied, total, percent)
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, result []byte) {
+			log.Printf("on ok: %d/%d(%.2f%%)\nresult: %s", copied, total, percent, string(result))
 		},
 		// On error
 		func(err error) {
@@ -87,11 +87,11 @@ func ExampleNewDownloadTask() {
 		},
 		// On stop
 		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte) {
-			log.Printf("on stop(%v): %d/%d(%.2f%%), state: %s", cause, copied, total, percent, string(state))
+			log.Printf("on stop(%v): %d/%d(%.2f%%)\nstate: %s", cause, copied, total, percent, string(state))
 		},
 		// On ok
-		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
-			log.Printf("on ok: %d/%d(%.2f%%)", copied, total, percent)
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, result []byte) {
+			log.Printf("on ok: %d/%d(%.2f%%)\nresult: %s", copied, total, percent, string(result))
 		},
 		// On error
 		func(err error) {

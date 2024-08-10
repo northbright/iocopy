@@ -43,7 +43,11 @@ func (t *CopyFileTask) reader() io.Reader {
 }
 
 func (t *CopyFileTask) state() ([]byte, error) {
-	return json.Marshal(t)
+	return json.MarshalIndent(t, "", "    ")
+}
+
+func (t *CopyFileTask) result() ([]byte, error) {
+	return json.MarshalIndent(t, "", "    ")
 }
 
 func NewCopyFileTask(dst, src string) (Task, error) {
@@ -152,7 +156,7 @@ func CopyFile(ctx context.Context, dst, src string, bufSize uint) error {
 		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte) {
 			err = cause
 		},
-		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, result []byte) {
 			err = nil
 		},
 		func(e error) {
@@ -228,7 +232,7 @@ func CopyFileFromFS(ctx context.Context, dst string, srcFS fs.FS, src string, bu
 		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte) {
 			err = cause
 		},
-		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, result []byte) {
 			err = nil
 		},
 		func(e error) {

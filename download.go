@@ -46,7 +46,11 @@ func (t *DownloadTask) reader() io.Reader {
 }
 
 func (t *DownloadTask) state() ([]byte, error) {
-	return json.Marshal(t)
+	return json.MarshalIndent(t, "", "    ")
+}
+
+func (t *DownloadTask) result() ([]byte, error) {
+	return json.MarshalIndent(t, "", "    ")
 }
 
 func NewDownloadTask(dst, url string) (Task, error) {
@@ -144,7 +148,7 @@ func Download(ctx context.Context, dst, url string, bufSize uint) error {
 		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte) {
 			err = cause
 		},
-		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, result []byte) {
 			err = nil
 		},
 		func(e error) {
