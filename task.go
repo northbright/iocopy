@@ -75,13 +75,13 @@ func Do(
 
 			t.setCopied(ew.Copied())
 
-			state, err := t.state()
-			if err != nil {
-				if onError != nil {
-					onError(err)
-				}
-			} else {
-				if onStop != nil {
+			if onStop != nil {
+				state, err := t.state()
+				if err != nil {
+					if onError != nil {
+						onError(err)
+					}
+				} else {
 					onStop(
 						ew.IsTotalKnown(),
 						ew.Total(),
