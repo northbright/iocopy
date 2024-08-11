@@ -7,19 +7,18 @@ import (
 
 type OnWritten func(isTotalKnown bool, total, copied, written uint64, percent float32)
 
-type OnStop func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte)
+type OnStop func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error)
 
 type OnOK func(isTotalKnown bool, total, copied, written uint64, percent float32)
 
 type OnError func(err error)
 
 type Task interface {
-	writer() io.Writer
-	reader() io.Reader
-	total() (bool, uint64)
-	copied() uint64
-	setCopied(uint64)
-	state() ([]byte, error)
+	Writer() io.Writer
+	Reader() io.Reader
+	Total() (bool, uint64)
+	Copied() uint64
+	SetCopied(uint64)
 }
 
 func Do(
@@ -30,16 +29,16 @@ func Do(
 	onStop OnStop,
 	onOK OnOK,
 	onError OnError) {
-	isTotalKnown, total := t.total()
-	copied := t.copied()
+	isTotalKnown, total := t.Total()
+	copied := t.Copied()
 
-	w := t.writer()
+	w := t.Writer()
 	wc, ok := w.(io.WriteCloser)
 	if ok {
 		defer wc.Close()
 	}
 
-	r := t.reader()
+	r := t.Reader()
 	rc, ok := r.(io.ReadCloser)
 	if ok {
 		defer rc.Close()
@@ -73,31 +72,25 @@ func Do(
 		case *EventStop:
 			ew := ev.EventWritten()
 
-			t.setCopied(ew.Copied())
+			// Set number of bytes copied for the task.
+			t.SetCopied(ew.Copied())
 
 			if onStop != nil {
-				state, err := t.state()
-				if err != nil {
-					if onError != nil {
-						onError(err)
-					}
-				} else {
-					onStop(
-						ew.IsTotalKnown(),
-						ew.Total(),
-						ew.Copied(),
-						ew.Written(),
-						ew.Percent(),
-						ev.Cause(),
-						state,
-					)
-				}
+				onStop(
+					ew.IsTotalKnown(),
+					ew.Total(),
+					ew.Copied(),
+					ew.Written(),
+					ew.Percent(),
+					ev.Cause(),
+				)
 			}
 
 		case *EventOK:
 			ew := ev.EventWritten()
 
-			t.setCopied(ew.Copied())
+			// Set number of bytes copied for the task.
+			t.SetCopied(ew.Copied())
 
 			if onOK != nil {
 				onOK(
