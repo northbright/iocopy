@@ -38,8 +38,8 @@ func ExampleNewHashTask() {
 			log.Printf("on stop(%v): %d/%d(%.2f%%)\nstate: %s", cause, copied, total, percent, string(state))
 		},
 		// On ok
-		func(isTotalKnown bool, total, copied, written uint64, percent float32, result []byte) {
-			log.Printf("on ok: %d/%d(%.2f%%)\nresult: %s", copied, total, percent, string(result))
+		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
+			log.Printf("on ok: %d/%d(%.2f%%)", copied, total, percent)
 
 		},
 		// On error

@@ -148,7 +148,7 @@ func Download(ctx context.Context, dst, url string, bufSize uint) error {
 		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error, state []byte) {
 			err = cause
 		},
-		func(isTotalKnown bool, total, copied, written uint64, percent float32, result []byte) {
+		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
 			err = nil
 		},
 		func(e error) {
