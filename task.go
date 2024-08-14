@@ -20,8 +20,8 @@ type OnError func(err error)
 
 // Task is the interface of io copy task which is passed to [Do].
 type Task interface {
-	Writer() (io.Writer, error)
-	Reader() (io.Reader, error)
+	Writer() io.Writer
+	Reader() io.Reader
 	Total() (bool, uint64)
 	Copied() uint64
 	SetCopied(uint64)
@@ -47,27 +47,13 @@ func Do(
 	isTotalKnown, total := t.Total()
 	copied := t.Copied()
 
-	// Get io.Writer.
-	w, err := t.Writer()
-	if err != nil {
-		if onError != nil {
-			onError(err)
-		}
-	}
-
+	w := t.Writer()
 	wc, ok := w.(io.WriteCloser)
 	if ok {
 		defer wc.Close()
 	}
 
-	// Get io.Reader.
-	r, err := t.Reader()
-	if err != nil {
-		if onError != nil {
-			onError(err)
-		}
-	}
-
+	r := t.Reader()
 	rc, ok := r.(io.ReadCloser)
 	if ok {
 		defer rc.Close()
