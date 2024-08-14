@@ -20,8 +20,8 @@ type OnError func(err error)
 
 // Task is the interface of io copy task which is passed to [Do].
 type Task interface {
-	Writer() (io.Writer, error)
 	Reader() (io.Reader, error)
+	Writer() (io.Writer, error)
 	Total() (bool, uint64)
 	Copied() uint64
 	SetCopied(uint64)
