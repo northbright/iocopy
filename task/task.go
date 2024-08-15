@@ -3,22 +3,9 @@ package task
 import (
 	"context"
 	"io"
-	"time"
 
 	"github.com/northbright/iocopy"
 )
-
-// OnWritten is the type of function called by [Do] when n bytes is written(copied) successfully.
-type OnWritten func(isTotalKnown bool, total, copied, written uint64, percent float32)
-
-// OnStop is the type of function called by [Do] when copy is stopped. The cause parameter is returned by context.Err().
-type OnStop func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error)
-
-// OnOK is the type of function called by [Do] when copy is done.
-type OnOK func(isTotalKnown bool, total, copied, written uint64, percent float32)
-
-// OnError is the type of function called by [Do] when error occurs.
-type OnError func(err error)
 
 // Task is the interface of io copy task which is passed to [Do].
 type Task interface {
@@ -29,31 +16,24 @@ type Task interface {
 	SetCopied(uint64)
 }
 
-// Do does io copy task and block caller's go routine until an error occurs or copy stopped by user or copy is done.
-// Parameters:
+// Do does IO copy task and block caller's go routine until an error occurs or copy stopped by user or copy is done.
 // ctx: context.Context.
-// It can be created using context.WithCancel, context.WithDeadline,
-// context.WithTimeout...
 // t: [Task]
-// bufSize: size of the buffer. It'll create a buffer in the new goroutine according to the buffer size.
-// interval: Interval to reports n bytes written(copied) during the IO copy.
+// onWritten: callback on bytes written.
+// onStop: callback on copy is stopped.
+// onOK: callback on copy is done.
+// onError: callback on an error occurs.
+// options: optional parameters(e.g. buffer size, refresh rate...).
 func Do(
 	ctx context.Context,
 	t Task,
-	bufSize uint,
-	interval time.Duration,
-	onWritten OnWritten,
-	onStop OnStop,
-	onOK OnOK,
-	onError OnError) {
+	onWritten iocopy.OnWritten,
+	onStop iocopy.OnStop,
+	onOK iocopy.OnOK,
+	onError iocopy.OnError,
+	options ...iocopy.Option) {
 	isTotalKnown, total := t.Total()
 	copied := t.Copied()
-
-	w := t.Writer()
-	wc, ok := w.(io.WriteCloser)
-	if ok {
-		defer wc.Close()
-	}
 
 	r := t.Reader()
 	rc, ok := r.(io.ReadCloser)
@@ -61,70 +41,62 @@ func Do(
 		defer rc.Close()
 	}
 
-	ch := iocopy.Start(
-		ctx,
-		w,
+	w := t.Writer()
+	wc, ok := w.(io.WriteCloser)
+	if ok {
+		defer wc.Close()
+	}
+
+	c := iocopy.New(
+		// Src.
 		r,
-		bufSize,
-		interval,
+		// Dst,
+		w,
+		// Is total bytes to copy known.
 		isTotalKnown,
+		// Total number of bytes to copy.
 		total,
+		// The number of bytes copied.
 		copied,
+		// Options.
+		options...,
 	)
 
-	// Read the events from the channel.
-	for event := range ch {
-		switch ev := event.(type) {
-		case *iocopy.EventWritten:
-			if onWritten != nil {
-				onWritten(
-					ev.IsTotalKnown(),
-					ev.Total(),
-					ev.Copied(),
-					ev.Written(),
-					ev.Percent(),
-				)
-			}
-
-		case *iocopy.EventStop:
-			ew := ev.EventWritten()
-
+	c.Do(
+		ctx,
+		// On bytes written(copied).
+		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
 			// Set number of bytes copied for the task.
-			t.SetCopied(ew.Copied())
+			t.SetCopied(copied)
+
+			if onWritten != nil {
+				onWritten(isTotalKnown, total, copied, written, percent)
+			}
+		},
+		// On stop.
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error) {
+			// Set number of bytes copied for the task.
+			t.SetCopied(copied)
 
 			if onStop != nil {
-				onStop(
-					ew.IsTotalKnown(),
-					ew.Total(),
-					ew.Copied(),
-					ew.Written(),
-					ew.Percent(),
-					ev.Cause(),
-				)
+				onStop(isTotalKnown, total, copied, written, percent, cause)
 			}
-
-		case *iocopy.EventOK:
-			ew := ev.EventWritten()
-
+		},
+		// On ok.
+		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
 			// Set number of bytes copied for the task.
-			t.SetCopied(ew.Copied())
+			t.SetCopied(copied)
 
 			if onOK != nil {
-				onOK(
-					ew.IsTotalKnown(),
-					ew.Total(),
-					ew.Copied(),
-					ew.Written(),
-					ew.Percent(),
-				)
+				onOK(isTotalKnown, total, copied, written, percent)
 			}
 
-		case *iocopy.EventError:
-			err := ev.Err()
-
+		},
+		// On error.
+		func(err error) {
 			if onError != nil {
 				onError(err)
 			}
-		}
-	}
+		},
+	)
 }
