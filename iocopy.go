@@ -12,8 +12,8 @@ const (
 	// DefaultBufSize is the default buffer size.
 	DefaultBufSize = uint(32 * 1024)
 
-	// DefaultInterval is the default interval to report the number of bytes written.
-	DefaultInterval = 500 * time.Millisecond
+	// DefaultRefreshRate is the default refresh rate of EventWritten / OnWritten callback.
+	DefaultRefreshRate = 500 * time.Millisecond
 )
 
 // Event is the interface that wraps String method.
@@ -179,13 +179,13 @@ func ComputePercent(total, prevCopied, written uint64, done bool) float32 {
 
 func cp(
 	ctx context.Context,
-	dst io.Writer,
 	src io.Reader,
-	bufSize uint,
-	interval time.Duration,
+	dst io.Writer,
 	isTotalKnown bool,
 	total uint64,
 	prevCopied uint64,
+	bufSize uint,
+	refreshRate time.Duration,
 	ch chan Event) {
 	var (
 		written, oldWritten uint64
@@ -207,12 +207,12 @@ func cp(
 	}
 	buf := make([]byte, bufSize)
 
-	if interval > 0 {
-		ticker = time.NewTicker(interval)
+	if refreshRate > 0 {
+		ticker = time.NewTicker(refreshRate)
 	} else {
-		// If interval <= 0, use default interval to create the ticker
+		// If refreshRate <= 0, use default refreshRate to create the ticker
 		// and stop it immediately.
-		ticker = time.NewTicker(DefaultInterval)
+		ticker = time.NewTicker(DefaultRefreshRate)
 		ticker.Stop()
 	}
 
@@ -268,36 +268,175 @@ func cp(
 	}
 }
 
-// Start returns a channel for the caller to receive IO copy events and start a goroutine to do IO copy.
-// ctx: context.Context.
-// It can be created using context.WithCancel, context.WithDeadline,
-// context.WithTimeout...
-// dst: io.Writer to copy to.
+type Copier struct {
+	src          io.Reader
+	dst          io.Writer
+	isTotalKnown bool
+	total        uint64
+	prevCopied   uint64
+	bufSize      uint
+	refreshRate  time.Duration
+}
+
+type Option func(c *Copier)
+
+// BufSize returns the option for buffer size.
+func BufSize(size uint) Option {
+	return func(c *Copier) {
+		c.bufSize = size
+	}
+}
+
+// RefreshRate returns the option for refresh rate of EventWritten / OnWritten callback.
+func RefreshRate(refreshRate time.Duration) Option {
+	return func(c *Copier) {
+		c.refreshRate = refreshRate
+	}
+}
+
+// New returns a Copier.
 // src: io.Reader to copy from.
-// bufSize: size of the buffer. It'll create a buffer in the new goroutine according to the buffer size.
-// interval: It'll create a time.Ticker by given interval to send the EventWritten event to the channel during the IO copy.
-// A negative or zero duration causes it to stop the ticker immediately.
-// In this case, it'll send the EventWritten to the channel only once when IO copy succeeds.
-// You may set it to DefaultInterval.
+// dst: io.Writer to copy to.
 // isTotalKnown: if total bytes to copy is known or not.
 // total: total number of bytes to copy.
 // prevCopied: the number of bytes prevCopied previously.
-// The number of bytes to copy for this time = total - prevCopied.
-//
-// It returns a channel to receive IO copy events.
-// You may use a for-range loop to read events from the channel.
-func Start(
-	ctx context.Context,
-	dst io.Writer,
+func New(
 	src io.Reader,
-	bufSize uint,
-	interval time.Duration,
+	dst io.Writer,
 	isTotalKnown bool,
 	total uint64,
-	prevCopied uint64) <-chan Event {
+	prevCopied uint64,
+	options ...func(c *Copier),
+) *Copier {
+	c := &Copier{
+		src:          src,
+		dst:          dst,
+		isTotalKnown: isTotalKnown,
+		total:        total,
+		prevCopied:   prevCopied,
+		bufSize:      DefaultBufSize,
+		refreshRate:  DefaultRefreshRate,
+	}
+
+	for _, option := range options {
+		option(c)
+	}
+
+	return c
+}
+
+// Start returns a channel for the caller to receive IO copy events and start a goroutine to do IO copy.
+// ctx: context.Context.
+// It can be created using context.WithCancel, context.WithDeadline, context.WithTimeout...
+// It returns a channel to receive IO copy events.
+// You may use a for-range loop to read events from the channel.
+func (c *Copier) Start(ctx context.Context) <-chan Event {
 	ch := make(chan Event)
 
-	go cp(ctx, dst, src, bufSize, interval, true, total, prevCopied, ch)
+	go cp(ctx, c.src, c.dst, c.isTotalKnown, c.total, c.prevCopied, c.bufSize, c.refreshRate, ch)
 
 	return ch
 }
+
+// OnWritten is the type of function called by [Do] called when n bytes is written(copied) successfully.
+type OnWritten func(isTotalKnown bool, total, copied, written uint64, percent float32)
+
+// OnStop is the type of function called by [Do] when copy is stopped. The cause parameter is returned by context.Err().
+type OnStop func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error)
+
+// OnOK is the type of function called by [Do] when copy is done.
+type OnOK func(isTotalKnown bool, total, copied, written uint64, percent float32)
+
+// OnError is the type of function called by [Do] when error occurs.
+type OnError func(err error)
+
+/*
+// Do does io copy task and block caller's go routine until an error occurs or copy stopped by user or copy is done.
+// Parameters:
+// ctx: context.Context.
+// It can be created using context.WithCancel, context.WithDeadline,
+// context.WithTimeout...
+// bufSize: size of the buffer. It'll create a buffer in the new goroutine according to the buffer size.
+// refreshRate: Interval to reports n bytes written(copied) during the IO copy.
+func Do(
+	ctx context.Context,
+	dst io.Writer,
+	src io.Reader,
+	isTotalKnown bool,
+	total uint64,
+	prevCopied uint64,
+	bufSize uint,
+	refreshRate time.Duration,
+	onWritten OnWritten,
+	onStop OnStop,
+	onOK OnOK,
+	onError OnError) {
+
+	ch := iocopy.Start(
+		ctx,
+		w,
+		r,
+		bufSize,
+		refreshRate,
+		isTotalKnown,
+		total,
+		copied,
+	)
+
+	// Read the events from the channel.
+	for event := range ch {
+		switch ev := event.(type) {
+		case *iocopy.EventWritten:
+			if onWritten != nil {
+				onWritten(
+					ev.IsTotalKnown(),
+					ev.Total(),
+					ev.Copied(),
+					ev.Written(),
+					ev.Percent(),
+				)
+			}
+
+		case *iocopy.EventStop:
+			ew := ev.EventWritten()
+
+			// Set number of bytes copied for the task.
+			t.SetCopied(ew.Copied())
+
+			if onStop != nil {
+				onStop(
+					ew.IsTotalKnown(),
+					ew.Total(),
+					ew.Copied(),
+					ew.Written(),
+					ew.Percent(),
+					ev.Cause(),
+				)
+			}
+
+		case *iocopy.EventOK:
+			ew := ev.EventWritten()
+
+			// Set number of bytes copied for the task.
+			t.SetCopied(ew.Copied())
+
+			if onOK != nil {
+				onOK(
+					ew.IsTotalKnown(),
+					ew.Total(),
+					ew.Copied(),
+					ew.Written(),
+					ew.Percent(),
+				)
+			}
+
+		case *iocopy.EventError:
+			err := ev.Err()
+
+			if onError != nil {
+				onError(err)
+			}
+		}
+	}
+}
+*/

@@ -12,7 +12,7 @@ import (
 	"github.com/northbright/iocopy"
 )
 
-func ExampleStart() {
+func ExampleCopier_Start() {
 	var (
 		total  uint64 = 0
 		copied uint64 = 0
@@ -21,7 +21,6 @@ func ExampleStart() {
 
 	// Example of Start() - Part I.
 	// ----------------------------------------------------------------------
-	// It does the same thing as Example of Start().
 	// It shows:
 	// (1). how to stop the IO copy and save the state.
 	// (2). how to process the EventProgress event.
@@ -49,29 +48,31 @@ func ExampleStart() {
 	// hash.Hash is an io.Writer.
 	hash := sha256.New()
 
+	// Create a copier.
+	c := iocopy.New(
+		// Src.
+		resp.Body,
+		// Dst.
+		hash,
+		// Is total bytes to copy known.
+		isTotalKnown,
+		// Total number of bytes to copy.
+		total,
+		// The number of bytes copied.
+		copied,
+		// Buffer size.
+		iocopy.BufSize(uint(16*1024*1024)),
+		// Refresh rate.
+		iocopy.RefreshRate(80*time.Millisecond),
+	)
+
 	// create a context with timeout to emulate the users' cancalation of the IO copy.
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
 
 	// Start a goroutine to do IO copy.
 	// Read from response.Body and write to an hash.Hash to compute the hash.
-	ch := iocopy.Start(
-		// context
-		ctx,
-		// writer(dst)
-		hash,
-		// reader(src)
-		resp.Body,
-		// buffer size
-		16*1024*1024,
-		// interval to report the number of bytes written
-		80*time.Millisecond,
-		// is total bytes to copy known
-		isTotalKnown,
-		// total number of bytes to copy
-		total,
-		// the number of bytes copied
-		copied)
+	ch := c.Start(ctx)
 
 	log.Printf("Example of Start() - Part I: IO copy gouroutine started.")
 
@@ -148,28 +149,30 @@ func ExampleStart() {
 	unmarshaler, _ := hash2.(encoding.BinaryUnmarshaler)
 	unmarshaler.UnmarshalBinary(state)
 
+	// Create a copier.
+	c2 := iocopy.New(
+		// Src.
+		resp2.Body,
+		// Dst.
+		hash2,
+		// Is total bytes to copy known.
+		isTotalKnown,
+		// Total number of bytes to copy.
+		total,
+		// The number of bytes copied.
+		copied,
+		// Buffer size.
+		iocopy.BufSize(uint(16*1024*1024)),
+		// Refresh rate.
+		iocopy.RefreshRate(80*time.Millisecond),
+	)
+
 	// Create a context.
 	ctx2 := context.Background()
 
 	// Start a goroutine to do IO copy.
 	// Read from response.Body and write to an hash.Hash to compute the hash.
-	ch2 := iocopy.Start(
-		// context
-		ctx2,
-		// writer(dst)
-		hash2,
-		// reader(src)
-		resp2.Body,
-		// buffer size
-		16*1024*1024,
-		// interval to report the number of bytes written
-		80*time.Millisecond,
-		// is total bytes to copy known
-		isTotalKnown,
-		// total number of bytes to copy
-		total,
-		// number of bytes copied
-		copied)
+	ch2 := c2.Start(ctx2)
 
 	log.Printf("Example of Start() - Part II: IO copy gouroutine started.")
 
