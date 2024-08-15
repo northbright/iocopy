@@ -268,6 +268,7 @@ func cp(
 	}
 }
 
+// Copier contains information to do IO copy.
 type Copier struct {
 	src          io.Reader
 	dst          io.Writer
@@ -278,6 +279,7 @@ type Copier struct {
 	refreshRate  time.Duration
 }
 
+// Option is the function used to set optional parameters for Copier.
 type Option func(c *Copier)
 
 // BufSize returns the option for buffer size.
@@ -300,13 +302,14 @@ func RefreshRate(refreshRate time.Duration) Option {
 // isTotalKnown: if total bytes to copy is known or not.
 // total: total number of bytes to copy.
 // prevCopied: the number of bytes prevCopied previously.
+// options: optional parameters(e.g. buffer size, refresh rate...).
 func New(
 	src io.Reader,
 	dst io.Writer,
 	isTotalKnown bool,
 	total uint64,
 	prevCopied uint64,
-	options ...func(c *Copier),
+	options ...Option,
 ) *Copier {
 	c := &Copier{
 		src:          src,
@@ -350,43 +353,29 @@ type OnOK func(isTotalKnown bool, total, copied, written uint64, percent float32
 // OnError is the type of function called by [Do] when error occurs.
 type OnError func(err error)
 
-/*
-// Do does io copy task and block caller's go routine until an error occurs or copy stopped by user or copy is done.
-// Parameters:
+// Do does io copy task and block caller's go routine until:
+// * an error occurs
+// * copy stopped
+// * copy is done
+//
 // ctx: context.Context.
-// It can be created using context.WithCancel, context.WithDeadline,
-// context.WithTimeout...
-// bufSize: size of the buffer. It'll create a buffer in the new goroutine according to the buffer size.
-// refreshRate: Interval to reports n bytes written(copied) during the IO copy.
-func Do(
+// onWritten: callback on bytes written.
+// onStop: callback on copy is stopped.
+// onOK: callback on copy is done.
+// onError: callback on an error occurs.
+func (c *Copier) Do(
 	ctx context.Context,
-	dst io.Writer,
-	src io.Reader,
-	isTotalKnown bool,
-	total uint64,
-	prevCopied uint64,
-	bufSize uint,
-	refreshRate time.Duration,
 	onWritten OnWritten,
 	onStop OnStop,
 	onOK OnOK,
 	onError OnError) {
 
-	ch := iocopy.Start(
-		ctx,
-		w,
-		r,
-		bufSize,
-		refreshRate,
-		isTotalKnown,
-		total,
-		copied,
-	)
+	ch := c.Start(ctx)
 
 	// Read the events from the channel.
 	for event := range ch {
 		switch ev := event.(type) {
-		case *iocopy.EventWritten:
+		case *EventWritten:
 			if onWritten != nil {
 				onWritten(
 					ev.IsTotalKnown(),
@@ -397,11 +386,8 @@ func Do(
 				)
 			}
 
-		case *iocopy.EventStop:
+		case *EventStop:
 			ew := ev.EventWritten()
-
-			// Set number of bytes copied for the task.
-			t.SetCopied(ew.Copied())
 
 			if onStop != nil {
 				onStop(
@@ -414,11 +400,8 @@ func Do(
 				)
 			}
 
-		case *iocopy.EventOK:
+		case *EventOK:
 			ew := ev.EventWritten()
-
-			// Set number of bytes copied for the task.
-			t.SetCopied(ew.Copied())
 
 			if onOK != nil {
 				onOK(
@@ -430,7 +413,7 @@ func Do(
 				)
 			}
 
-		case *iocopy.EventError:
+		case *EventError:
 			err := ev.Err()
 
 			if onError != nil {
@@ -439,4 +422,3 @@ func Do(
 		}
 	}
 }
-*/

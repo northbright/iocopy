@@ -222,3 +222,83 @@ func ExampleCopier_Start() {
 	// SHA-256:
 	// 9e2f2a4031b215922aa21a3695e30bbfa1f7707597834287415dbc862c6a3251
 }
+
+func ExampleCopier_Do() {
+	var (
+		total  uint64 = 0
+		copied uint64 = 0
+	)
+
+	// URL of the remote file.
+	// SHA-256: 9e2f2a4031b215922aa21a3695e30bbfa1f7707597834287415dbc862c6a3251
+	downloadURL := "https://golang.google.cn/dl/go1.20.1.darwin-amd64.pkg"
+
+	// Do HTTP request and get the HTTP response body and the content length.
+	resp, isTotalKnown, total, isRangeSupported, err := httputil.GetResp(downloadURL)
+	if err != nil {
+		log.Printf("GetResp() error: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	log.Printf("GetResp() for %v OK", downloadURL)
+	log.Printf("is total size known: %v, size: %d, is range supported: %v",
+		isTotalKnown,
+		total,
+		isRangeSupported)
+
+	// Create a hash.Hash for SHA-256.
+	// hash.Hash is an io.Writer.
+	hash := sha256.New()
+
+	// Create a copier.
+	c := iocopy.New(
+		// Src.
+		resp.Body,
+		// Dst.
+		hash,
+		// Is total bytes to copy known.
+		isTotalKnown,
+		// Total number of bytes to copy.
+		total,
+		// The number of bytes copied.
+		copied,
+		// Buffer size.
+		iocopy.BufSize(uint(16*1024*1024)),
+		// Refresh rate.
+		iocopy.RefreshRate(80*time.Millisecond),
+	)
+
+	ctx := context.Background()
+
+	// Do IO copy and block caller's go routine.
+	// Read from response.Body and write to an hash.Hash to compute the hash.
+	c.Do(
+		// Context.
+		ctx,
+		// On bytes written(copied).
+		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
+			log.Printf("on written: %d/%d(%.2f%%)", copied, total, percent)
+		},
+		// On stop.
+		func(isTotalKnown bool, total, copied, written uint64, percent float32, cause error) {
+			log.Printf("on stop(%v): %d/%d(%.2f%%)", cause, copied, total, percent)
+		},
+		// On ok.
+		func(isTotalKnown bool, total, copied, written uint64, percent float32) {
+			log.Printf("on ok: %d/%d(%.2f%%)", copied, total, percent)
+
+			// Get the final SHA-256 checksum of the remote file.
+			checksum := hash.Sum(nil)
+			fmt.Printf("SHA-256:\n%x\n", checksum)
+		},
+		// On error.
+		func(err error) {
+			log.Printf("on error: %v", err)
+		},
+	)
+
+	// Output:
+	// SHA-256:
+	// 9e2f2a4031b215922aa21a3695e30bbfa1f7707597834287415dbc862c6a3251
+}
