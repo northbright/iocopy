@@ -1,9 +1,11 @@
-package iocopy
+package task
 
 import (
 	"context"
 	"io"
 	"time"
+
+	"github.com/northbright/iocopy"
 )
 
 // OnWritten is the type of function called by [Do] when n bytes is written(copied) successfully.
@@ -59,7 +61,7 @@ func Do(
 		defer rc.Close()
 	}
 
-	ch := Start(
+	ch := iocopy.Start(
 		ctx,
 		w,
 		r,
@@ -73,7 +75,7 @@ func Do(
 	// Read the events from the channel.
 	for event := range ch {
 		switch ev := event.(type) {
-		case *EventWritten:
+		case *iocopy.EventWritten:
 			if onWritten != nil {
 				onWritten(
 					ev.IsTotalKnown(),
@@ -84,7 +86,7 @@ func Do(
 				)
 			}
 
-		case *EventStop:
+		case *iocopy.EventStop:
 			ew := ev.EventWritten()
 
 			// Set number of bytes copied for the task.
@@ -101,7 +103,7 @@ func Do(
 				)
 			}
 
-		case *EventOK:
+		case *iocopy.EventOK:
 			ew := ev.EventWritten()
 
 			// Set number of bytes copied for the task.
@@ -117,7 +119,7 @@ func Do(
 				)
 			}
 
-		case *EventError:
+		case *iocopy.EventError:
 			err := ev.Err()
 
 			if onError != nil {
