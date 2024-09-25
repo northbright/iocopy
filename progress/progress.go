@@ -2,7 +2,6 @@ package progress
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 )
@@ -123,11 +122,9 @@ func (p *Progress) Start(ctx context.Context, chExit <-chan struct{}) {
 		for {
 			select {
 			case <-chExit:
-				log.Printf("on exit")
 				p.callback()
 				return
 			case <-ctx.Done():
-				log.Printf("on ctx.Done()")
 				return
 			case <-ch:
 				p.callback()
