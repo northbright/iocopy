@@ -42,6 +42,8 @@ func ExampleNew() {
 	p := progress.New(
 		// Total size.
 		size,
+		// Number of bytes copied previously.
+		0,
 		// OnWrittenFunc callback
 		progress.OnWritten(func(total, prev, current int64, percent float32) {
 			log.Printf("%v / %v(%.2f%%) bytes read and computed", current, total, percent)

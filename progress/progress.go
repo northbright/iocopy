@@ -54,13 +54,6 @@ type Progress struct {
 // Option represents the optional parameter when new a [Progress].
 type Option func(p *Progress)
 
-// Prev returns an option to set the number of copied bytes previously.
-func Prev(prev int64) Option {
-	return func(p *Progress) {
-		p.prev = prev
-	}
-}
-
 // OnWritten returns an option to set the callback function to report progress.
 func OnWritten(fn OnWrittenFunc) Option {
 	return func(p *Progress) {
@@ -77,10 +70,12 @@ func Interval(d time.Duration) Option {
 
 // New creates a [Progress].
 // total: total number of bytes to copy.
+// prev: number of bytes copied previously.
 // options: optional parameters returned by [Prev], [OnWritten] and [Interval].
-func New(total int64, options ...Option) *Progress {
+func New(total, prev int64, options ...Option) *Progress {
 	p := &Progress{
 		total: total,
+		prev:  prev,
 	}
 
 	for _, option := range options {
