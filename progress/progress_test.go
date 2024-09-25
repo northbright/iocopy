@@ -53,9 +53,13 @@ func ExampleNew() {
 	// Create a multiple writer and duplicate the writes to p.
 	mw := io.MultiWriter(hash, p)
 
+	// Create a context.
+	// Uncomment below lines to test stopping IO copy with a timeout.
+	//ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*800)
+	//defer cancel()
 	ctx := context.Background()
 
-	// Create a channel and sent an empty struct to it when the function exits.
+	// Create a channel used to make the progress goroutine to receive the signal to exit.
 	chExit := make(chan struct{}, 1)
 	defer func() {
 		chExit <- struct{}{}
@@ -73,8 +77,10 @@ func ExampleNew() {
 			log.Printf("iocopy.Copy() error: %v", err)
 			return
 		}
+
 		log.Printf("iocopy.Copy() stopped, cause: %v", ctx.Err())
 	}
+
 	log.Printf("iocopy.Copy() OK. %v bytes copied", n)
 
 	// Get checksum.
