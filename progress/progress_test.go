@@ -63,6 +63,7 @@ func ExampleNew() {
 	chExit := make(chan struct{}, 1)
 	defer func() {
 		chExit <- struct{}{}
+		close(chExit)
 	}()
 
 	// Starts a new goroutine and a ticker to call the callback(OnWrittenFunc).
