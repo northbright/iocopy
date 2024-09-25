@@ -14,7 +14,7 @@ import (
 )
 
 func ExampleNew() {
-	// This example uses iocopy.Copy to read stream from a remote file,
+	// Uses iocopy.Copy to read stream from a remote file,
 	// and compute its SHA-256 checksum.
 
 	// SHA-256: dd9e772686ed908bcff94b6144322d4e2473a7dcd7c696b7e8b6d12f23c887fd
@@ -80,10 +80,9 @@ func ExampleNew() {
 		}
 
 		log.Printf("iocopy.Copy() stopped, cause: %v", ctx.Err())
-		return
+	} else {
+		log.Printf("iocopy.Copy() OK, %v bytes copied", n)
 	}
-
-	log.Printf("iocopy.Copy() OK. %v bytes copied", n)
 
 	// Get checksum.
 	checksum := hash.Sum(nil)

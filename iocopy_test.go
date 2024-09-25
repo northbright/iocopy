@@ -45,6 +45,8 @@ func ExampleCopy() {
 		}
 		// Stopped.
 		log.Printf("iocopy.Copy() stopped, cause: %v\nbytes copied: %v", ctx.Err(), n)
+	} else {
+		log.Printf("iocopy.Copy() OK, %v bytes copied", n)
 	}
 
 	// Create a request with "range" header set.
@@ -76,8 +78,11 @@ func ExampleCopy() {
 		}
 		// Stopped.
 		log.Printf("iocopy.Copy() stopped, cause: %v\nbytes copied: %v", ctx.Err(), n)
+	} else {
+		log.Printf("iocopy.Copy() OK, %v bytes copied", n2)
 	}
-	log.Printf("iocopy.Copy() done.\nbytes copied: %v, total: %v bytes copied", n2, n+n2)
+
+	log.Printf("total: %v bytes copied", n+n2)
 
 	checksum := hash.Sum(nil)
 	fmt.Printf("SHA-256:\n%x\n", checksum)

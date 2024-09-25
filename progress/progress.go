@@ -125,6 +125,7 @@ func (p *Progress) Start(ctx context.Context, chExit <-chan struct{}) {
 				p.callback()
 				return
 			case <-ctx.Done():
+				p.callback()
 				return
 			case <-ch:
 				p.callback()
