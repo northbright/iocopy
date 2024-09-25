@@ -19,6 +19,14 @@ var (
 // current: the number of bytes written currently.
 func Percent(total, prev, current int64) float32 {
 	if total == 0 {
+		return 100
+	}
+
+	if total < 0 {
+		return 0
+	}
+
+	if prev+current < 0 {
 		return 0
 	}
 
