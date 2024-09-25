@@ -5,14 +5,19 @@ import (
 	"log"
 	"sync"
 	"time"
-
-	"github.com/northbright/iocopy"
 )
 
 var (
 	// DefaultInterval is the default interval of the tick of callback to report progress.
 	DefaultInterval = time.Millisecond * 500
 )
+
+// OnWrittenFunc is the callback function when bytes are copied successfully.
+// total: total number of bytes to copy.
+// prev: number of bytes copied previously.
+// current: number of bytes copied in current copy.
+// percent: percent copied.
+type OnWrittenFunc func(total, prev, current int64, percent float32)
 
 // Percent returns the percentage.
 // total: total number of the bytes to copy.
@@ -42,7 +47,7 @@ type Progress struct {
 	current  int64
 	old      int64
 	lock     sync.RWMutex
-	fn       iocopy.OnWrittenFunc
+	fn       OnWrittenFunc
 	interval time.Duration
 }
 
@@ -57,7 +62,7 @@ func Prev(prev int64) Option {
 }
 
 // OnWritten returns an option to set the callback function to report progress.
-func OnWritten(fn iocopy.OnWrittenFunc) Option {
+func OnWritten(fn OnWrittenFunc) Option {
 	return func(p *Progress) {
 		p.fn = fn
 	}

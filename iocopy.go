@@ -43,10 +43,3 @@ func CopyBuffer(ctx context.Context, dst io.Writer, src io.Reader, buf []byte) (
 		buf,
 	)
 }
-
-// OnWrittenFunc is the callback function when bytes are copied successfully.
-// total: total number of bytes to copy.
-// prev: number of bytes copied previously.
-// current: number of bytes copied in current copy.
-// percent: percent copied.
-type OnWrittenFunc func(total, prev, current int64, percent float32)
