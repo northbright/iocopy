@@ -66,7 +66,7 @@ func ExampleNew() {
 		close(chExit)
 	}()
 
-	// Starts a new goroutine and a ticker to call the callback(OnWrittenFunc).
+	// Starts a new goroutine and a ticker to call the callback to report progress.
 	// The goroutine exits when an empty struct is send to chExit or ctx.Done().
 	p.Start(ctx, chExit)
 
