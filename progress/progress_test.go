@@ -80,6 +80,7 @@ func ExampleNew() {
 		}
 
 		log.Printf("iocopy.Copy() stopped, cause: %v", ctx.Err())
+		return
 	}
 
 	log.Printf("iocopy.Copy() OK. %v bytes copied", n)
