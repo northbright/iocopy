@@ -45,6 +45,12 @@ type Progress struct {
 
 type Option func(p *Progress)
 
+func Prev(prev int64) Option {
+	return func(p *Progress) {
+		p.prev = prev
+	}
+}
+
 func OnWritten(fn iocopy.OnWrittenFunc) Option {
 	return func(p *Progress) {
 		p.fn = fn
@@ -57,10 +63,9 @@ func Interval(d time.Duration) Option {
 	}
 }
 
-func New(total, prev int64, options ...Option) *Progress {
+func New(total int64, options ...Option) *Progress {
 	p := &Progress{
 		total: total,
-		prev:  prev,
 	}
 
 	for _, option := range options {
