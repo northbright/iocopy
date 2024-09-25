@@ -16,8 +16,6 @@ import (
 func ExampleNew() {
 	// This example uses iocopy.Copy to read stream from a remote file,
 	// and compute its SHA-256 checksum.
-	// It uses a timeout context to emulate user cancelation to stop the calculation.
-	// Then it calls iocopy.Copy again to resume the calculation.
 
 	// SHA-256: dd9e772686ed908bcff94b6144322d4e2473a7dcd7c696b7e8b6d12f23c887fd
 	url := "https://golang.google.cn/dl/go1.23.1.darwin-amd64.pkg"
