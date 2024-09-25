@@ -10,6 +10,7 @@ import (
 )
 
 var (
+	// DefaultInterval is the default interval of the tick of callback to report progress.
 	DefaultInterval = time.Millisecond * 500
 )
 
@@ -33,6 +34,8 @@ func Percent(total, prev, current int64) float32 {
 	return float32(float64(prev+current) / (float64(total) / float64(100)))
 }
 
+// Progress implements the [io.Writer] interface.
+// Call [*Progress.Start] to starts a new goroutine to report progress.
 type Progress struct {
 	total    int64
 	prev     int64
@@ -43,26 +46,33 @@ type Progress struct {
 	interval time.Duration
 }
 
+// Option represents the optional parameter when new a [Progress].
 type Option func(p *Progress)
 
+// Prev returns an option to set the number of copied bytes previously.
 func Prev(prev int64) Option {
 	return func(p *Progress) {
 		p.prev = prev
 	}
 }
 
+// OnWritten returns an option to set the callback function to report progress.
 func OnWritten(fn iocopy.OnWrittenFunc) Option {
 	return func(p *Progress) {
 		p.fn = fn
 	}
 }
 
+// Interval returns an option to set the tick interval for the callback function.
 func Interval(d time.Duration) Option {
 	return func(p *Progress) {
 		p.interval = d
 	}
 }
 
+// New creates a [Progress].
+// total: total number of bytes to copy.
+// options: optional parameters returned by [Prev], [OnWritten] and [Interval].
 func New(total int64, options ...Option) *Progress {
 	p := &Progress{
 		total: total,
@@ -79,6 +89,7 @@ func New(total int64, options ...Option) *Progress {
 	return p
 }
 
+// Write implements [io.Writer] interface.
 func (p *Progress) Write(b []byte) (n int, err error) {
 	n = len(b)
 	p.lock.Lock()
@@ -87,6 +98,7 @@ func (p *Progress) Write(b []byte) (n int, err error) {
 	return n, nil
 }
 
+// callback calls the callback function to report progress.
 func (p *Progress) callback() {
 	if p.fn != nil {
 		p.lock.RLock()
@@ -98,6 +110,8 @@ func (p *Progress) callback() {
 	}
 }
 
+// Start starts a new goroutine and tick to call the callback to report progress.
+// It exits when it receives data from ctx.Done() or chExit.
 func (p *Progress) Start(ctx context.Context, chExit <-chan struct{}) {
 	ch := time.Tick(p.interval)
 
