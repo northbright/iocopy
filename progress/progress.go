@@ -13,14 +13,14 @@ var (
 )
 
 // OnWrittenFunc is the callback function when bytes are copied successfully.
-// total: total number of bytes to copy.
+// total: total number of bytes to copy. A negative value indicates total size is unknown and percent should be ignored.
 // prev: number of bytes copied previously.
 // current: number of bytes copied in current copy.
 // percent: percent copied.
 type OnWrittenFunc func(total, prev, current int64, percent float32)
 
 // Percent returns the percentage.
-// total: total number of the bytes to copy.
+// total: total number of the bytes to copy. A negative value indicates total size is unknown.
 // prev: the number of the bytes copied previously.
 // current: the number of bytes written currently.
 func Percent(total, prev, current int64) float32 {
@@ -69,7 +69,7 @@ func Interval(d time.Duration) Option {
 }
 
 // New creates a [Progress].
-// total: total number of bytes to copy.
+// total: total number of bytes to copy. A negative value indicates total size is unknown.
 // prev: number of bytes copied previously.
 // options: optional parameters returned by [Prev], [OnWritten] and [Interval].
 func New(total, prev int64, options ...Option) *Progress {
