@@ -118,6 +118,10 @@ func (p *Progress) callback() {
 // Start starts a new goroutine and tick to call the callback to report progress.
 // It exits when it receives data from ctx.Done() or chExit.
 func (p *Progress) Start(ctx context.Context, chExit <-chan struct{}) {
+	if p.fn == nil {
+		return
+	}
+
 	ch := time.Tick(p.interval)
 
 	go func() {
