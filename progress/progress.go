@@ -61,6 +61,7 @@ func OnWritten(fn OnWrittenFunc) Option {
 }
 
 // Interval returns an option to set the tick interval for the callback function.
+// If no interval option specified, it'll use [DefaultInterval].
 func Interval(d time.Duration) Option {
 	return func(p *Progress) {
 		p.interval = d
