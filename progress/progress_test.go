@@ -28,7 +28,8 @@ func ExampleNew() {
 	defer resp.Body.Close()
 
 	// Get size of the remote file.
-	size := int64(0)
+	// -1 indicates the size is unknown.
+	size := int64(-1)
 	str := resp.Header.Get("Content-Length")
 	if str != "" {
 		size, _ = strconv.ParseInt(str, 10, 64)
