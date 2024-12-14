@@ -2,6 +2,7 @@ package progress
 
 import (
 	"context"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -47,6 +48,7 @@ type Progress struct {
 	prev     int64
 	current  int64
 	old      int64
+	done     bool
 	lock     sync.RWMutex
 	fn       OnWrittenFunc
 	interval time.Duration
@@ -100,6 +102,11 @@ func (p *Progress) Write(b []byte) (n int, err error) {
 	p.lock.Lock()
 	p.current += int64(n)
 	p.lock.Unlock()
+
+	if p.total == p.prev+p.current {
+		p.callback()
+		p.done = true
+	}
 	return n, nil
 }
 
@@ -116,8 +123,8 @@ func (p *Progress) callback() {
 }
 
 // Start starts a new goroutine and tick to call the callback to report progress.
-// It exits when it receives data from ctx.Done() or chExit.
-func (p *Progress) Start(ctx context.Context, chExit <-chan struct{}) {
+// It exits when it receives data from ctx.Done().
+func (p *Progress) Start(ctx context.Context) {
 	if p.fn == nil {
 		return
 	}
@@ -127,14 +134,16 @@ func (p *Progress) Start(ctx context.Context, chExit <-chan struct{}) {
 	go func() {
 		for {
 			select {
-			case <-chExit:
-				p.callback()
-				return
 			case <-ctx.Done():
 				p.callback()
 				return
 			case <-ch:
 				p.callback()
+			default:
+				if p.done == true {
+					return
+				}
+				runtime.Gosched()
 			}
 		}
 	}()

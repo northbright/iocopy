@@ -58,16 +58,9 @@ func ExampleNew() {
 	//defer cancel()
 	ctx := context.Background()
 
-	// Create a channel used to make the progress goroutine to receive the signal to exit.
-	chExit := make(chan struct{}, 1)
-	defer func() {
-		chExit <- struct{}{}
-		close(chExit)
-	}()
-
 	// Starts a new goroutine and a ticker to call the callback to report progress.
-	// The goroutine exits when an empty struct is send to chExit or ctx.Done().
-	p.Start(ctx, chExit)
+	// The goroutine exits when IO copy is done or canceled.
+	p.Start(ctx)
 
 	// Call iocopy.Copy to read stream of the remote file and compute SHA-256 checksum.
 	// It blocks the main goroutine.
