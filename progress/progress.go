@@ -2,6 +2,7 @@ package progress
 
 import (
 	"context"
+	"log"
 	"runtime"
 	"sync"
 	"time"
@@ -132,6 +133,10 @@ func (p *Progress) Start(ctx context.Context) {
 	ch := time.Tick(p.interval)
 
 	go func() {
+		defer func() {
+			log.Printf("progress goroutine exited")
+		}()
+
 		for {
 			select {
 			case <-ctx.Done():
