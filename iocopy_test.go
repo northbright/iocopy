@@ -50,6 +50,8 @@ func ExampleCopy() {
 	} else {
 		// IO copy done after first call, no need to resume.
 		log.Printf("iocopy.Copy() OK, %v bytes copied", n)
+		checksum := hash.Sum(nil)
+		fmt.Printf("SHA-256:\n%x\n", checksum)
 		return
 	}
 
@@ -139,6 +141,8 @@ func ExampleCopyBuffer() {
 	} else {
 		// IO copy done after first call, no need to resume.
 		log.Printf("iocopy.CopyBuffer() OK, %v bytes copied", n)
+		checksum := hash.Sum(nil)
+		fmt.Printf("SHA-256:\n%x\n", checksum)
 		return
 	}
 
@@ -247,6 +251,8 @@ func ExampleCopyWithProgress() {
 	} else {
 		// IO copy done after first call, no need to resume.
 		log.Printf("iocopy.CopyWithProgress() OK, %v bytes copied", n)
+		checksum := hash.Sum(nil)
+		fmt.Printf("SHA-256:\n%x\n", checksum)
 		return
 	}
 
@@ -367,6 +373,8 @@ func ExampleCopyBufferWithProgress() {
 	} else {
 		// IO copy done after first call, no need to resume.
 		log.Printf("iocopy.CopyBufferWithProgress() OK, %v bytes copied", n)
+		checksum := hash.Sum(nil)
+		fmt.Printf("SHA-256:\n%x\n", checksum)
 		return
 	}
 
