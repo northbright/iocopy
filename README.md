@@ -8,7 +8,6 @@ iocopy is a [Golang](https://golang.org) package which provides [Context](https:
 
 ## Docs
 * <https://pkg.go.dev/github.com/northbright/iocopy>
-* <https://pkg.go.dev/github.com/northbright/iocopy/progress>
 
 ## License
 * [MIT License](LICENSE)
