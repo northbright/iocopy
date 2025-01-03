@@ -367,6 +367,7 @@ func ExampleCopyBufferWithProgress() {
 	} else {
 		// IO copy done after first call, no need to resume.
 		log.Printf("iocopy.CopyBufferWithProgress() OK, %v bytes copied", n)
+		return
 	}
 
 	// Create a request with "range" header set.
