@@ -48,7 +48,9 @@ func ExampleCopy() {
 		// Stopped.
 		log.Printf("iocopy.Copy() stopped, cause: %v\nbytes copied: %v", ctx.Err(), n)
 	} else {
+		// IO copy done after first call, no need to resume.
 		log.Printf("iocopy.Copy() OK, %v bytes copied", n)
+		return
 	}
 
 	// Create a request with "range" header set.
@@ -135,7 +137,9 @@ func ExampleCopyBuffer() {
 		// Stopped.
 		log.Printf("iocopy.CopyBuffer() stopped, cause: %v\nbytes copied: %v", ctx.Err(), n)
 	} else {
+		// IO copy done after first call, no need to resume.
 		log.Printf("iocopy.CopyBuffer() OK, %v bytes copied", n)
+		return
 	}
 
 	// Create a request with "range" header set.
@@ -184,10 +188,6 @@ func ExampleCopyBuffer() {
 }
 
 func ExampleCopyWithProgress() {
-	var (
-		total int64
-	)
-
 	// This example uses iocopy.CopyWithProgress to read stream from a remote file,
 	// and compute its SHA-256 checksum.
 	// It uses a timeout context to emulate user cancelation to stop the calculation.
@@ -205,6 +205,7 @@ func ExampleCopyWithProgress() {
 	defer resp.Body.Close()
 
 	// Get content length.
+	total := int64(0)
 	str := resp.Header.Get("Content-Length")
 	if str != "" {
 		if total, err = strconv.ParseInt(str, 10, 64); err != nil {
@@ -244,7 +245,9 @@ func ExampleCopyWithProgress() {
 		// Stopped.
 		log.Printf("iocopy.CopyWithProgress() stopped, cause: %v\nbytes copied: %v", ctx.Err(), n)
 	} else {
+		// IO copy done after first call, no need to resume.
 		log.Printf("iocopy.CopyWithProgress() OK, %v bytes copied", n)
+		return
 	}
 
 	// Create a request with "range" header set.
@@ -301,10 +304,6 @@ func ExampleCopyWithProgress() {
 }
 
 func ExampleCopyBufferWithProgress() {
-	var (
-		total int64
-	)
-
 	// This example uses iocopy.CopyBufferWithProgress to read stream from a remote file,
 	// and compute its SHA-256 checksum.
 	// It uses a timeout context to emulate user cancelation to stop the calculation.
@@ -322,6 +321,7 @@ func ExampleCopyBufferWithProgress() {
 	defer resp.Body.Close()
 
 	// Get content length.
+	total := int64(0)
 	str := resp.Header.Get("Content-Length")
 	if str != "" {
 		if total, err = strconv.ParseInt(str, 10, 64); err != nil {
@@ -365,6 +365,7 @@ func ExampleCopyBufferWithProgress() {
 		// Stopped.
 		log.Printf("iocopy.CopyBufferWithProgress() stopped, cause: %v\nbytes copied: %v", ctx.Err(), n)
 	} else {
+		// IO copy done after first call, no need to resume.
 		log.Printf("iocopy.CopyBufferWithProgress() OK, %v bytes copied", n)
 	}
 
