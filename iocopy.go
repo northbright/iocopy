@@ -47,6 +47,10 @@ func computePercent(total, prev, current int64) float32 {
 		return 0
 	}
 
+	if prev+current == total {
+		return 100
+	}
+
 	return float32(float64(prev+current) / (float64(total) / float64(100)))
 }
 
@@ -87,14 +91,10 @@ func CopyWithProgress(
 
 				if fn != nil {
 					current += int64(n)
-					if total == prev+current {
-						fn(total, prev, current, 100)
-					} else {
-						percent = computePercent(total, prev, current)
-						if percent != oldPercent {
-							fn(total, prev, current, percent)
-							oldPercent = percent
-						}
+					percent = computePercent(total, prev, current)
+					if percent != oldPercent {
+						fn(total, prev, current, percent)
+						oldPercent = percent
 					}
 				}
 				return n, nil
@@ -149,14 +149,10 @@ func CopyBufferWithProgress(
 
 				if fn != nil {
 					current += int64(n)
-					if total == prev+current {
-						fn(total, prev, current, 100)
-					} else {
-						percent = computePercent(total, prev, current)
-						if percent != oldPercent {
-							fn(total, prev, current, percent)
-							oldPercent = percent
-						}
+					percent = computePercent(total, prev, current)
+					if percent != oldPercent {
+						fn(total, prev, current, percent)
+						oldPercent = percent
 					}
 				}
 				return n, nil
