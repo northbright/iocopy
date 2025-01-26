@@ -230,6 +230,10 @@ func ExampleCopyWithProgress() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
 	defer cancel()
 
+	// Set interval to report progress(optional).
+	// Default interval is 700 milliseconds.
+	//iocopy.ReportProgressInterval = 180
+
 	// Call iocopy.CopyWithProgress to start the calculation.
 	n, err := iocopy.CopyWithProgress(
 		ctx,

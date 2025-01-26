@@ -3,6 +3,16 @@ package iocopy
 import (
 	"context"
 	"io"
+	"time"
+)
+
+const (
+	DefaultReportProgressInterval = 700 * time.Millisecond
+)
+
+var (
+	// Interval to report progress of IO copy.
+	ReportProgressInterval = DefaultReportProgressInterval
 )
 
 // readFunc is used to implement [io.Reader] interface and capture the [context.Context] parameter.
@@ -77,7 +87,15 @@ func CopyBufferWithProgress(
 		current    int64
 		percent    float32
 		oldPercent float32
+		t          time.Time
 	)
+
+	if fn != nil {
+		if ReportProgressInterval <= 0 {
+			ReportProgressInterval = DefaultReportProgressInterval
+			t = time.Now().Add(ReportProgressInterval)
+		}
+	}
 
 	writeFn := writeFunc(func(p []byte) (n int, err error) {
 		select {
@@ -91,12 +109,22 @@ func CopyBufferWithProgress(
 
 			if fn != nil {
 				current += int64(n)
-				percent = computePercent(total, prev, current)
-				if percent != oldPercent {
-					fn(total, prev, current, percent)
-					oldPercent = percent
+
+				if time.Now().After(t) == true {
+					t = time.Now().Add(ReportProgressInterval)
+
+					percent = computePercent(total, prev, current)
+					if percent != oldPercent {
+						fn(total, prev, current, percent)
+						oldPercent = percent
+					}
+				} else {
+					if prev+current == total {
+						fn(total, prev, current, 100)
+					}
 				}
 			}
+
 			return n, nil
 		}
 	})
