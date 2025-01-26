@@ -232,7 +232,7 @@ func ExampleCopyWithProgress() {
 
 	// Set interval to report progress(optional).
 	// Default interval is 700 milliseconds.
-	//iocopy.ReportProgressInterval = 180
+	iocopy.ReportProgressInterval = 180 * time.Millisecond
 
 	// Call iocopy.CopyWithProgress to start the calculation.
 	n, err := iocopy.CopyWithProgress(
