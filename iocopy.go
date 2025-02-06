@@ -7,6 +7,7 @@ import (
 )
 
 const (
+	// Default interval to report progress of IO copy.
 	DefaultReportProgressInterval = 700 * time.Millisecond
 )
 
