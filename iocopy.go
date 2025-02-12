@@ -139,6 +139,7 @@ func CopyBufferWithProgress(
 		}
 	})
 
+	// writeFn implements io.Writer and calls fn to report IO copy progress.
 	if fn != nil {
 		if buf != nil && len(buf) > 0 {
 			return io.CopyBuffer(writeFn, readFn, buf)
@@ -146,6 +147,7 @@ func CopyBufferWithProgress(
 			return io.Copy(writeFn, readFn)
 		}
 	} else {
+		// No need to report IO copy progress, use original dst as io.Writer.
 		if buf != nil && len(buf) > 0 {
 			return io.CopyBuffer(dst, readFn, buf)
 		} else {
